@@ -1,0 +1,29 @@
+version: '3'
+services:
+  db:
+    image: timescale/timescaledb-postgis
+    ports:
+      - 5432:5432
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: post11
+  flask:
+    image: ngsild-flask
+    ports:
+      - 5000:5000
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - "./:/app"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=post11
+      - POSTGRES_HOST=192.168.43.57
+
+    depends_on:
+      - db
