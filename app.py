@@ -3,6 +3,7 @@ import os
 from psycopg2 import connect
 import json
 import datetime
+import traceback
 
 app = Flask(__name__)
 app.debug = True
@@ -13,7 +14,6 @@ host = os.getenv('POSTGRES_HOST')
 password = os.getenv('POSTGRES_PASSWORD')
 conn = connect(dbname = dbName, user = user,host = host,password = password)
 cursor = conn.cursor()
-# declare connection instance
 
 @app.route('/temporal/entities/', methods=['GET'])
 def get_temporal_entities():
@@ -25,23 +25,10 @@ def get_temporal_entities():
 		data = get_temporal_entities_parameters(args)
 		if data['timerel'] not in ['after','before', 'between']:
 			return Response("Wrong timerel property", status=400, )
-		if data['timerel'] == 'after':
-			statement = "SELECT * FROM entity WHERE observedat>'"+data['time']+"'"
-		elif data['timerel'] == 'before':
-			statement = "SELECT * FROM entity WHERE observedat<'"+data['time']+"'"
-		else:
-			if not data['endtime']:
-				return Response("Wrong endtime value", status=400, )
-			else:
-				statement = "SELECT * FROM entity WHERE observedat>='"+data['time']+"' AND observedat<'"+data['endtime']+"'"
-		if data['id_data']:
-			statement += ' AND id in ' + data['id_data']
-		if data['type_data']:
-			statement += ' AND type in' + data['type_data']
-		statement +=" order by observedat desc"
-		if data['lastN']:
-			statement += " limit " + data['lastN']	
-		statement += ";"
+		if data['timerel'] == 'between' and (not data['endtime']):
+			return Response("Wrong endtime value", status=400, )
+		statement = build_sql_query_for_entities(data)
+		print(statement)
 		cursor.execute(statement)
 		for i, record in enumerate(cursor):
 			record = list(record)
@@ -50,8 +37,34 @@ def get_temporal_entities():
 		response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
 		return response
 	except Exception as e:
+		print("Error: get_temporal_entity")
 		print(e)
+		print(traceback.format_exc())
 		abort(400)
+
+def build_sql_query_for_entities(data):
+	statement = ''
+	try:
+		if data['timerel'] == 'after':
+			statement = "SELECT * FROM entity WHERE observedat>'"+data['time']+"'"
+		elif data['timerel'] == 'before':
+			statement = "SELECT * FROM entity WHERE observedat<'"+data['time']+"'"
+		else:
+			statement = "SELECT * FROM entity WHERE observedat>='"+data['time']+"' AND observedat<'"+data['endtime']+"'"
+		if data['id_data']:
+			statement += ' AND id in ' + data['id_data']
+		if data['type_data']:
+			statement += ' AND type in' + data['type_data']
+		if data['idPattern']:
+			statement += " AND lower(id) like '%" + data['idPattern'] + "%'"
+		statement +=" order by observedat desc"
+		if data['lastN']:
+			statement += " limit " + data['lastN']	
+		statement += ";"
+	except Exception as e:
+		print("Error: build_sql_query_for_entities")
+		print(traceback.format_exc())
+	return statement
 
 def get_temporal_entities_parameters(args):
 	data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None, 'id_data': '', 'type_data': '','idPattern': None, 'q':None, 'csf':None, 'georel': None, 'geometry': None, 'coordinates': None, 'geoproperty': None}
@@ -112,7 +125,7 @@ def get_temporal_entities_parameters(args):
 						data['type_data'] +=  "'"+types[index] + "',"
 	except Exception as e:
 		print("Error: get_temporal_entities_parameters")
-		print(e)
+		print(traceback.format_exc())
 	return data
 
 @app.route('/temporal/entities/<entity_id>/', methods=['GET'])
@@ -125,19 +138,9 @@ def get_temporal_entity(entity_id):
 		data = get_temporal_entity_parameters(args)
 		if data['timerel'] not in ['after','before', 'between']:
 			return Response("Wrong timerel property", status=400, )
-		if data['timerel'] == 'after':
-			statement = "SELECT * FROM entity WHERE observedat>'"+data['time']+"'"
-		elif data['timerel'] == 'before':
-			statement = "SELECT * FROM entity WHERE observedat<'"+data['time']+"'"
-		else:
-			if not data['endtime']:
-				return Response("Wrong endtime value", status=400, )
-			else:
-				statement = "SELECT * FROM entity WHERE observedat>='"+data['time']+"' AND observedat<'"+data['endtime']+"'"
-		statement += " AND id = '" + entity_id + "' order by observedat desc"
-		if data['lastN']:
-			statement += " limit " + data['lastN']	
-		statement += ";"
+		if data['timerel'] == 'between' and (not data['endtime']):
+			return Response("Wrong endtime value", status=400, )
+		statement = build_sql_query_for_entity(data, entity_id)
 		cursor.execute(statement)
 		for i, record in enumerate(cursor):
 			record = list(record)
@@ -146,8 +149,27 @@ def get_temporal_entity(entity_id):
 		response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
 		return response
 	except Exception as e:
-		print(e)
+		print("Error: get_temporal_entity")
+		print(traceback.format_exc())
 		abort(400)
+
+def build_sql_query_for_entity(data, entity_id):
+	statement = ''
+	try:
+		if data['timerel'] == 'after':
+			statement = "SELECT * FROM entity WHERE observedat>'"+data['time']+"'"
+		elif data['timerel'] == 'before':
+			statement = "SELECT * FROM entity WHERE observedat<'"+data['time']+"'"
+		else:
+			statement = "SELECT * FROM entity WHERE observedat>='"+data['time']+"' AND observedat<'"+data['endtime']+"'"
+		statement += " AND id = '" + entity_id + "' order by observedat desc"
+		if data['lastN']:
+			statement += " limit " + data['lastN']	
+		statement += ";"
+	except Exception as e:
+		print("Error: build_sql_query_for_entity")
+		print(traceback.format_exc())
+	return statement
 
 def get_temporal_entity_parameters(args):
 	data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None}
@@ -166,7 +188,7 @@ def get_temporal_entity_parameters(args):
 			data['lastN'] = args.get('lastN')
 	except Exception as e:
 		print("Error: get_temporal_entity_parameters")
-		print(e)
+		print(traceback.format_exc())
 	return data
 
 if __name__ == '__main__':
