@@ -28,7 +28,6 @@ def get_temporal_entities():
 		if data['timerel'] == 'between' and (not data['endtime']):
 			return Response("Wrong endtime value", status=400, )
 		statement = build_sql_query_for_entities(data)
-		print(statement)
 		cursor.execute(statement)
 		for i, record in enumerate(cursor):
 			record = list(record)
