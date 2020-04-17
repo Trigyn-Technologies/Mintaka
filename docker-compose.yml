@@ -11,19 +11,38 @@ services:
       POSTGRES_DB: post11
   flask:
     image: ngsild-flask
-    ports:
-      - 5000:5000
     build:
       context: .
       dockerfile: Dockerfile
     volumes:
       - "./:/app"
+    command: flask run --host=0.0.0.0
+    networks:
+      my-network:
+        aliases:
+          - flask-app
+    ports:
+        - 8080:5000
     environment:
       - PYTHONUNBUFFERED=1
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=post11
       - POSTGRES_HOST=192.168.43.57
+      - FLASK_APP=/app.py
 
     depends_on:
       - db
+  nginx:
+    image: nginx:1.13.7
+    container_name: nginx
+    depends_on:
+        - flask
+    volumes:
+        - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+        - my-network
+    ports:
+        - 80:80
+networks:
+    my-network:

@@ -17,4 +17,4 @@ RUN pip3 install psycopg2
 # We copy the rest of the codebase into the image
 COPY . .
 ENV PYTHONPATH=$PWD:$PYTHONPATH
-CMD python app.py 
+#CMD python app.py 
