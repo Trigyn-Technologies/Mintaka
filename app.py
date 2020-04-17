@@ -27,8 +27,8 @@ def get_temporal_entities():
 			return Response("Wrong timerel property", status=400, )
 		if data['timerel'] == 'between' and (not data['endtime']):
 			return Response("Wrong endtime value", status=400, )
-		statement = build_sql_query_for_entities(data)
-		cursor.execute(statement)
+		statement, params = build_sql_query_for_entities(data)
+		cursor.execute(statement, params)
 		for i, record in enumerate(cursor):
 			record = list(record)
 			record[0] = record[0].strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -43,27 +43,48 @@ def get_temporal_entities():
 
 def build_sql_query_for_entities(data):
 	statement = ''
+	params = {}
 	try:
 		if data['timerel'] == 'after':
-			statement = "SELECT * FROM entity WHERE observedat>'"+data['time']+"'"
+			statement = "SELECT * FROM entity WHERE observedat>%(time)s"
+			params["time"] = data['time']
 		elif data['timerel'] == 'before':
-			statement = "SELECT * FROM entity WHERE observedat<'"+data['time']+"'"
+			statement = "SELECT * FROM entity WHERE observedat<%(time)s"
+			params["time"] = data['time']
 		else:
-			statement = "SELECT * FROM entity WHERE observedat>='"+data['time']+"' AND observedat<'"+data['endtime']+"'"
-		if data['id_data']:
-			statement += ' AND id in ' + data['id_data']
-		if data['type_data']:
-			statement += ' AND type in' + data['type_data']
+			statement = "SELECT * FROM entity WHERE observedat>=%(time)s AND observedat<%(endtime)s"
+			params["time"] = data['time']
+			params["endtime"] = data['endtime']
+		if data['id_data'] and len(data['id_data']) > 0:
+			statement += ' AND lower(id) in ('
+			for index in range(0,len(data['id_data'])):
+				if index == (len(data['id_data']) -1):
+					statement += '%(id_data'+str(index)+')s'
+				else:
+					statement += '%(id_data'+str(index)+')s,'
+				params['id_data'+str(index)] = data['id_data'][index]
+			statement += ')'
+		if data['type_data'] and len(data['type_data']) > 0:
+			statement += ' AND lower(type) in ('
+			for index in range(0,len(data['type_data'])):
+				if index == (len(data['type_data']) -1):
+					statement += '%(type_data'+str(index)+')s'
+				else:
+					statement += '%(type_data'+str(index)+')s,'
+				params['type_data'+str(index)] = data['type_data'][index]
+			statement += ')'
 		if data['idPattern']:
-			statement += " AND lower(id) like '%" + data['idPattern'] + "%'"
+			statement += " AND lower(id) like %(idPattern)s"
+			params["idPattern"] = '%{}%'.format(data['idPattern'].lower())
 		statement +=" order by observedat desc"
 		if data['lastN']:
-			statement += " limit " + data['lastN']	
-		statement += ";"
+			statement += " limit %(lastN)s"
+			params["lastN"] = data['lastN']	
+		statement += "%s"%(";")
 	except Exception as e:
 		print("Error: build_sql_query_for_entities")
 		print(traceback.format_exc())
-	return statement
+	return statement, params
 
 def get_temporal_entities_parameters(args):
 	data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None, 'id_data': '', 'type_data': '','idPattern': None, 'q':None, 'csf':None, 'georel': None, 'geometry': None, 'coordinates': None, 'geoproperty': None}
@@ -95,33 +116,13 @@ def get_temporal_entities_parameters(args):
 		if 'geoproperty' in args and args.get('geoproperty'):
 			data['geoproperty'] = args.get('geoproperty')
 		if 'id' in args:
-			ids = args.get('id')
+			ids = args.get('id').lower()
 			if ids:
-				ids = ids.split(',') 
-			if len(ids) == 1:
-				data['id_data'] += "('" + ids[0] + "')"
-			else:
-				for index in range(0,len(ids)):
-					if index == 0:
-						data['id_data'] += "('" + ids[index] + "',"
-					elif index == (len(ids) -1):
-						data['id_data'] += "'"+ ids[index] + "')"
-					else:
-						data['id_data'] += "'"+ ids[index] + "',"
+				data['id_data'] = ids.split(',') 
 		if 'type' in args:
-			types = args.get('type')
+			types = args.get('type').lower()
 			if types:
-				types = types.split(',')
-			if len(types) == 1:
-				data['type_data'] += "('" + types[0] + "')"
-			else:
-				for index in range(0,len(types)):
-					if index == 0:
-						data['type_data'] += "('" + types[index] + "',"
-					elif index == (len(types) -1):
-						data['type_data'] +=  "'"+types[index] + "')"
-					else:
-						data['type_data'] +=  "'"+types[index] + "',"
+				data['type_data'] = types.split(',')
 	except Exception as e:
 		print("Error: get_temporal_entities_parameters")
 		print(traceback.format_exc())
@@ -139,8 +140,8 @@ def get_temporal_entity(entity_id):
 			return Response("Wrong timerel property", status=400, )
 		if data['timerel'] == 'between' and (not data['endtime']):
 			return Response("Wrong endtime value", status=400, )
-		statement = build_sql_query_for_entity(data, entity_id)
-		cursor.execute(statement)
+		statement, params = build_sql_query_for_entity(data, entity_id)
+		cursor.execute(statement,params)
 		for i, record in enumerate(cursor):
 			record = list(record)
 			record[0] = record[0].strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -154,21 +155,28 @@ def get_temporal_entity(entity_id):
 
 def build_sql_query_for_entity(data, entity_id):
 	statement = ''
+	params = {}
 	try:
 		if data['timerel'] == 'after':
-			statement = "SELECT * FROM entity WHERE observedat>'"+data['time']+"'"
+			statement = "SELECT * FROM entity WHERE observedat>%(time)s"
+			params["time"] = data['time']
 		elif data['timerel'] == 'before':
-			statement = "SELECT * FROM entity WHERE observedat<'"+data['time']+"'"
+			statement = "SELECT * FROM entity WHERE observedat<%(time)s"
+			params["time"] = data['time']
 		else:
-			statement = "SELECT * FROM entity WHERE observedat>='"+data['time']+"' AND observedat<'"+data['endtime']+"'"
-		statement += " AND id = '" + entity_id + "' order by observedat desc"
+			statement = "SELECT * FROM entity WHERE observedat>=%(time)s AND observedat<%(endtime)s"
+			params["time"] = data['time']
+			params["endtime"] = data['endtime']
+		statement += " AND id = %(entity_id)s order by observedat desc"
+		params["entity_id"] = entity_id
 		if data['lastN']:
-			statement += " limit " + data['lastN']	
-		statement += ";"
+			statement += " limit %(lastN)s"
+			params["lastN"] = data['lastN'] 
+		statement += "%s"%(';')
 	except Exception as e:
 		print("Error: build_sql_query_for_entity")
 		print(traceback.format_exc())
-	return statement
+	return statement, params
 
 def get_temporal_entity_parameters(args):
 	data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None}
@@ -190,5 +198,5 @@ def get_temporal_entity_parameters(args):
 		print(traceback.format_exc())
 	return data
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+# if __name__ == '__main__':
+#     app.run(debug=True, host='0.0.0.0')
