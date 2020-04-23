@@ -8,13 +8,6 @@ import traceback
 app = Flask(__name__)
 app.debug = True
 
-dbName = os.getenv('POSTGRES_DB')
-user = os.getenv('POSTGRES_USER')
-host = os.getenv('POSTGRES_HOST')
-password = os.getenv('POSTGRES_PASSWORD')
-conn = connect(dbname = dbName, user = user,host = host,password = password)
-cursor = conn.cursor()
-
 @app.route('/temporal/entities/', methods=['GET'])
 def get_temporal_entities():
 	response_data = []
@@ -22,6 +15,10 @@ def get_temporal_entities():
 		if request.method != 'GET':
 			return Response("No get data", status=400, )
 		args = request.args
+		conn = create_postgres_connection(request)
+		if not conn:
+			return Response("Database connection failed.", status=400, )
+		cursor = conn.cursor()
 		data = get_temporal_entities_parameters(args)
 		if data['timerel'] not in ['after','before', 'between']:
 			return Response("Wrong timerel property", status=400, )
@@ -34,8 +31,10 @@ def get_temporal_entities():
 			record[0] = record[0].strftime("%Y-%m-%dT%H:%M:%SZ")
 			response_data.append(record)
 		response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
+		close_postgres_connection(cursor, conn)
 		return response
 	except Exception as e:
+		close_postgres_connection(cursor, conn)
 		print("Error: get_temporal_entity")
 		print(e)
 		print(traceback.format_exc())
@@ -135,6 +134,10 @@ def get_temporal_entity(entity_id):
 		if request.method != 'GET':
 			return Response("No get data", status=400, )
 		args = request.args
+		conn = create_postgres_connection(request)
+		if not conn:
+			return Response("Database connection failed.", status=400, )
+		cursor = conn.cursor()
 		data = get_temporal_entity_parameters(args)
 		if data['timerel'] not in ['after','before', 'between']:
 			return Response("Wrong timerel property", status=400, )
@@ -147,8 +150,10 @@ def get_temporal_entity(entity_id):
 			record[0] = record[0].strftime("%Y-%m-%dT%H:%M:%SZ")
 			response_data.append(record)
 		response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
+		close_postgres_connection(cursor, conn)
 		return response
 	except Exception as e:
+		close_postgres_connection(cursor, conn)
 		print("Error: get_temporal_entity")
 		print(traceback.format_exc())
 		abort(400)
@@ -197,6 +202,30 @@ def get_temporal_entity_parameters(args):
 		print("Error: get_temporal_entity_parameters")
 		print(traceback.format_exc())
 	return data
+
+def create_postgres_connection(request):
+	conn = None
+	try:
+		if 'fiware-service' in request.headers and request.headers['fiware-service']:
+			dbName = request.headers['fiware-service']
+		else:
+			dbName = os.getenv('POSTGRES_DB')
+		user = os.getenv('POSTGRES_USER')
+		host = os.getenv('POSTGRES_HOST')
+		password = os.getenv('POSTGRES_PASSWORD')
+		conn = connect(dbname = dbName, user = user,host = host,password = password)
+	except Exception as e:
+		print("Error: create_postgres_connection")
+		print(traceback.format_exc())
+	return conn
+
+def close_postgres_connection(cursor, conn):
+	try:
+		cursor.close()
+		conn.close()
+	except Exception as e:
+		print("Error: close_postgres_connection")
+		print(traceback.format_exc())
 
 # if __name__ == '__main__':
 #     app.run(debug=True, host='0.0.0.0')
