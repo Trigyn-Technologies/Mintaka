@@ -14,6 +14,14 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt                             
 RUN apk update && apk add postgresql-dev gcc python3-dev musl-dev
 RUN pip3 install psycopg2
+RUN apk add --no-cache --virtual .build-deps gcc libc-dev libxslt-dev && \
+    apk add --no-cache libxslt && \
+    pip install --no-cache-dir lxml>=3.5.0 && \
+    apk del .build-deps
+RUN pip3 install PyLD
+RUN pip3 install validators
+RUN pip3 install -U flask-cors
+RUN pip3 install requests
 # We copy the rest of the codebase into the image
 COPY . .
 ENV PYTHONPATH=$PWD:$PYTHONPATH

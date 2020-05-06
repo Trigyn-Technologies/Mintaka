@@ -4,9 +4,16 @@ from psycopg2 import connect
 import json
 import datetime
 import traceback
+from pyld import jsonld
+import validators
+from flask_cors import CORS
+import logging
 
 app = Flask(__name__)
 app.debug = True
+CORS(app)
+jsonld.set_document_loader(jsonld.requests_document_loader(timeout=1))
+logging.basicConfig(level=logging.DEBUG)
 
 @app.route('/temporal/entities/', methods=['GET'])
 def get_temporal_entities():
@@ -16,10 +23,11 @@ def get_temporal_entities():
 			return Response("No get data", status=400, )
 		args = request.args
 		conn = create_postgres_connection(request)
+		context = get_context(request)
 		if not conn:
 			return Response("Database connection failed.", status=400, )
 		cursor = conn.cursor()
-		data = get_temporal_entities_parameters(args)
+		data = get_temporal_entities_parameters(args, context)
 		if data['timerel'] not in ['after','before', 'between']:
 			return Response("Wrong timerel property", status=400, )
 		if data['timerel'] == 'between' and (not data['endtime']):
@@ -35,9 +43,9 @@ def get_temporal_entities():
 		return response
 	except Exception as e:
 		close_postgres_connection(cursor, conn)
-		print("Error: get_temporal_entity")
-		print(e)
-		print(traceback.format_exc())
+		app.logger.error("Error: get_temporal_entity")
+		app.logger.error(e)
+		app.logger.error(traceback.format_exc())
 		abort(400)
 
 def build_sql_query_for_entities(data):
@@ -81,11 +89,11 @@ def build_sql_query_for_entities(data):
 			params["lastN"] = data['lastN']	
 		statement += "%s"%(";")
 	except Exception as e:
-		print("Error: build_sql_query_for_entities")
-		print(traceback.format_exc())
+		app.logger.error("Error: build_sql_query_for_entities")
+		app.logger.error(traceback.format_exc())
 	return statement, params
 
-def get_temporal_entities_parameters(args):
+def get_temporal_entities_parameters(args, context):
 	data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None, 'id_data': '', 'type_data': '','idPattern': None, 'q':None, 'csf':None, 'georel': None, 'geometry': None, 'coordinates': None, 'geoproperty': None}
 	try:
 		if 'timerel' in args:
@@ -121,10 +129,10 @@ def get_temporal_entities_parameters(args):
 		if 'type' in args:
 			types = args.get('type').lower()
 			if types:
-				data['type_data'] = types.split(',')
+				data['type_data'] = get_types_from_context(types.split(','), context)
 	except Exception as e:
-		print("Error: get_temporal_entities_parameters")
-		print(traceback.format_exc())
+		app.logger.error("Error: get_temporal_entities_parameters")
+		app.logger.error(traceback.format_exc())
 	return data
 
 @app.route('/temporal/entities/<entity_id>/', methods=['GET'])
@@ -134,6 +142,7 @@ def get_temporal_entity(entity_id):
 		if request.method != 'GET':
 			return Response("No get data", status=400, )
 		args = request.args
+		context = get_context(request)
 		conn = create_postgres_connection(request)
 		if not conn:
 			return Response("Database connection failed.", status=400, )
@@ -154,8 +163,8 @@ def get_temporal_entity(entity_id):
 		return response
 	except Exception as e:
 		close_postgres_connection(cursor, conn)
-		print("Error: get_temporal_entity")
-		print(traceback.format_exc())
+		app.logger.error("Error: get_temporal_entity")
+		app.logger.error(traceback.format_exc())
 		abort(400)
 
 def build_sql_query_for_entity(data, entity_id):
@@ -179,8 +188,8 @@ def build_sql_query_for_entity(data, entity_id):
 			params["lastN"] = data['lastN'] 
 		statement += "%s"%(';')
 	except Exception as e:
-		print("Error: build_sql_query_for_entity")
-		print(traceback.format_exc())
+		app.logger.error("Error: build_sql_query_for_entity")
+		app.logger.error(traceback.format_exc())
 	return statement, params
 
 def get_temporal_entity_parameters(args):
@@ -199,15 +208,15 @@ def get_temporal_entity_parameters(args):
 		if 'lastN' in args and args.get('lastN'):
 			data['lastN'] = args.get('lastN')
 	except Exception as e:
-		print("Error: get_temporal_entity_parameters")
-		print(traceback.format_exc())
+		app.logger.error("Error: get_temporal_entity_parameters")
+		app.logger.error(traceback.format_exc())
 	return data
 
 def create_postgres_connection(request):
 	conn = None
 	try:
-		if 'fiware-service' in request.headers and request.headers['fiware-service']:
-			dbName = request.headers['fiware-service']
+		if 'NGSILD-Tenant' in request.headers and request.headers['NGSILD-Tenant']:
+			dbName = request.headers['NGSILD-Tenant']
 		else:
 			dbName = os.getenv('POSTGRES_DB')
 		user = os.getenv('POSTGRES_USER')
@@ -215,8 +224,8 @@ def create_postgres_connection(request):
 		password = os.getenv('POSTGRES_PASSWORD')
 		conn = connect(dbname = dbName, user = user,host = host,password = password)
 	except Exception as e:
-		print("Error: create_postgres_connection")
-		print(traceback.format_exc())
+		app.logger.error("Error: create_postgres_connection")
+		app.logger.error(traceback.format_exc())
 	return conn
 
 def close_postgres_connection(cursor, conn):
@@ -224,8 +233,35 @@ def close_postgres_connection(cursor, conn):
 		cursor.close()
 		conn.close()
 	except Exception as e:
-		print("Error: close_postgres_connection")
-		print(traceback.format_exc())
+		app.logger.error("Error: close_postgres_connection")
+		app.logger.error(traceback.format_exc())
+
+def get_context(request):
+	context = ''
+	try:
+		if 'Link' in request.headers and request.headers['Link']:
+			context = request.headers['Link'].replace('<','').replace('>','')
+	except Exception as e:
+		app.logger.error("Error: get_context")
+		app.logger.error(traceback.format_exc())
+	return context
+
+def get_types_from_context(type_data, context):
+	context_list = []
+	try:
+		if context:
+			context_list.append(context)
+		context_list.append('https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld')
+		for count in range(0, len(type_data)):
+			if not validators.url(type_data[count]):
+				com = {"@context": context_list, "@type": type_data[count]}
+				expanded = jsonld.expand(com)
+				type_data[count] = expanded[0]['@type'][0]
+	except Exception as e:
+		app.logger.error("Error: get_types_from_context")
+		app.logger.error(traceback.format_exc())
+	return type_data
+
 
 # if __name__ == '__main__':
 #     app.run(debug=True, host='0.0.0.0')
