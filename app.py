@@ -8,12 +8,14 @@ from pyld import jsonld
 import validators
 from flask_cors import CORS
 import logging
+import requests
 
 app = Flask(__name__)
 app.debug = True
 CORS(app)
-jsonld.set_document_loader(jsonld.requests_document_loader(timeout=1))
+jsonld.set_document_loader(jsonld.requests_document_loader(timeout=4))
 logging.basicConfig(level=logging.DEBUG)
+app.context_dict = {}
 
 @app.route('/temporal/entities/', methods=['GET'])
 def get_temporal_entities():
@@ -127,7 +129,7 @@ def get_temporal_entities_parameters(args, context):
 			if ids:
 				data['id_data'] = ids.split(',') 
 		if 'type' in args:
-			types = args.get('type').lower()
+			types = args.get('type')
 			if types:
 				data['type_data'] = get_types_from_context(types.split(','), context)
 	except Exception as e:
@@ -240,7 +242,9 @@ def get_context(request):
 	context = ''
 	try:
 		if 'Link' in request.headers and request.headers['Link']:
-			context = request.headers['Link'].replace('<','').replace('>','')
+			context = request.headers['Link'].replace('<','').replace('>','').split(';')[0]
+			if context not in app.context_dict.keys():
+				load_context(context)
 	except Exception as e:
 		app.logger.error("Error: get_context")
 		app.logger.error(traceback.format_exc())
@@ -250,18 +254,39 @@ def get_types_from_context(type_data, context):
 	context_list = []
 	try:
 		if context:
-			context_list.append(context)
-		context_list.append('https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld')
+			if context in app.context_dict.keys():
+				context_list.append(app.context_dict[context])
+			else:
+				context_list.append(context)
+		context_list.append(app.context_dict[default_context])
 		for count in range(0, len(type_data)):
 			if not validators.url(type_data[count]):
 				com = {"@context": context_list, "@type": type_data[count]}
 				expanded = jsonld.expand(com)
+				app.logger.info(expanded)
 				type_data[count] = expanded[0]['@type'][0]
 	except Exception as e:
 		app.logger.error("Error: get_types_from_context")
 		app.logger.error(traceback.format_exc())
 	return type_data
 
+def load_context(context):
+	try:
+		if context:
+			headers = {'Accept': 'application/ld+json, application/json;q=0.5'} 
+			headers['Accept'] = headers['Accept'] + ', text/html;q=0.8, application/xhtml+xml;q=0.8'
+			response = requests.request('GET', context, headers = headers)
+			response = json.loads(response.text)
+			if '@context' in response:
+				app.context_dict[context] = response['@context']
+	except Exception as e:
+		app.logger.error("Error: load_context")
+		app.logger.error(traceback.format_exc())
+
+
+default_context = 'https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld'
+load_context(default_context)
 
 # if __name__ == '__main__':
-#     app.run(debug=True, host='0.0.0.0')
+	
+	#app.run(debug=True, host='0.0.0.0')
