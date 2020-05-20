@@ -178,7 +178,7 @@ def get_temporal_entity(entity_id):
 		if not conn:
 			return Response("Database connection failed.", status=400, )
 		cursor = conn.cursor()
-		data = get_temporal_entity_parameters(args)
+		data = get_temporal_entity_parameters(args, context)
 		if data['timerel'] not in ['after','before', 'between']:
 			return Response("Wrong timerel property", status=400, )
 		if data['timerel'] == 'between' and (not data['endtime']):
@@ -223,7 +223,7 @@ def build_sql_query_for_entity(data, entity_id):
 		app.logger.error(traceback.format_exc())
 	return statement, params
 
-def get_temporal_entity_parameters(args):
+def get_temporal_entity_parameters(args, context):
 	data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None}
 	try:
 		if 'timerel' in args:
@@ -238,8 +238,30 @@ def get_temporal_entity_parameters(args):
 			data['attrs'] = args.get('attrs').split(',')
 		if 'lastN' in args and args.get('lastN'):
 			data['lastN'] = args.get('lastN')
+		data = expand_entity_params(data, context)
 	except Exception as e:
 		app.logger.error("Error: get_temporal_entity_parameters")
+		app.logger.error(traceback.format_exc())
+	return data
+
+def expand_entity_params(data, context):
+	context_list = []
+	try:
+		if context:
+			if context in app.context_dict.keys():
+				context_list.append(app.context_dict[context])
+			else:
+				context_list.append(context)
+		context_list.append(app.context_dict[default_context])
+		if data['attrs']:
+			for count in range(0, len(data['attrs'])):
+				if not validators.url(data['attrs'][count]):
+					com = {"@context": context_list, data['attrs'][count]: data['attrs'][count]}
+					expanded = jsonld.expand(com)
+					data['attrs'][count] = list(expanded[0].keys())[0]
+		app.logger.info(data)
+	except Exception as e:
+		app.logger.error("Error: expand_entities_params")
 		app.logger.error(traceback.format_exc())
 	return data
 
