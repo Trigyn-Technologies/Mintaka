@@ -131,11 +131,40 @@ def get_temporal_entities_parameters(args, context):
 		if 'type' in args:
 			types = args.get('type')
 			if types:
-				data['type_data'] = get_types_from_context(types.split(','), context)
+				data['type_data'] = types.split(',')
+		data = expand_entities_params(data, context)
 	except Exception as e:
 		app.logger.error("Error: get_temporal_entities_parameters")
 		app.logger.error(traceback.format_exc())
 	return data
+
+def expand_entities_params(data, context):
+	context_list = []
+	try:
+		if context:
+			if context in app.context_dict.keys():
+				context_list.append(app.context_dict[context])
+			else:
+				context_list.append(context)
+		context_list.append(app.context_dict[default_context])
+		if data['attrs']:
+			for count in range(0, len(data['attrs'])):
+				if not validators.url(data['attrs'][count]):
+					com = {"@context": context_list, data['attrs'][count]: data['attrs'][count]}
+					expanded = jsonld.expand(com)
+					data['attrs'][count] = list(expanded[0].keys())[0]
+		if data['type_data']:
+			for count in range(0, len(data['type_data'])):
+				if not validators.url(data['type_data'][count]):
+					com = {"@context": context_list, "@type": data['type_data'][count]}
+					expanded = jsonld.expand(com)
+					data['type_data'][count] = expanded[0]['@type'][0]
+		app.logger.info(data)
+	except Exception as e:
+		app.logger.error("Error: expand_entities_params")
+		app.logger.error(traceback.format_exc())
+	return data
+
 
 @app.route('/temporal/entities/<entity_id>/', methods=['GET'])
 def get_temporal_entity(entity_id):
@@ -249,26 +278,6 @@ def get_context(request):
 		app.logger.error("Error: get_context")
 		app.logger.error(traceback.format_exc())
 	return context
-
-def get_types_from_context(type_data, context):
-	context_list = []
-	try:
-		if context:
-			if context in app.context_dict.keys():
-				context_list.append(app.context_dict[context])
-			else:
-				context_list.append(context)
-		context_list.append(app.context_dict[default_context])
-		for count in range(0, len(type_data)):
-			if not validators.url(type_data[count]):
-				com = {"@context": context_list, "@type": type_data[count]}
-				expanded = jsonld.expand(com)
-				app.logger.info(expanded)
-				type_data[count] = expanded[0]['@type'][0]
-	except Exception as e:
-		app.logger.error("Error: get_types_from_context")
-		app.logger.error(traceback.format_exc())
-	return type_data
 
 def load_context(context):
 	try:
