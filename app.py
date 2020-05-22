@@ -55,13 +55,13 @@ def build_sql_query_for_entities(data):
 	params = {}
 	try:
 		if data['timerel'] == 'after':
-			statement = "SELECT * FROM entity WHERE observedat>%(time)s"
+			statement = "SELECT * FROM entity_table WHERE observedat>%(time)s"
 			params["time"] = data['time']
 		elif data['timerel'] == 'before':
-			statement = "SELECT * FROM entity WHERE observedat<%(time)s"
+			statement = "SELECT * FROM entity_table WHERE observedat<%(time)s"
 			params["time"] = data['time']
 		else:
-			statement = "SELECT * FROM entity WHERE observedat>=%(time)s AND observedat<%(endtime)s"
+			statement = "SELECT * FROM entity_table WHERE observedat>=%(time)s AND observedat<%(endtime)s"
 			params["time"] = data['time']
 			params["endtime"] = data['endtime']
 		if data['id_data'] and len(data['id_data']) > 0:
@@ -114,6 +114,7 @@ def get_temporal_entities_parameters(args, context):
 			data['idPattern'] = args.get('idPattern')
 		if 'q' in args and args.get('q'):
 			data['q'] = args.get('q')
+			data = get_q_params(data)
 		if 'csf' in args and args.get('csf'):
 			data['csf'] = args.get('csf')
 		if 'georel' in args and args.get('georel'):
@@ -138,6 +139,28 @@ def get_temporal_entities_parameters(args, context):
 		app.logger.error(traceback.format_exc())
 	return data
 
+def get_q_params(data):
+	op_list = ['==', '!=', '>=','<=','>', '<','!~=','~=']
+	try:
+		params = data['q'].replace(' ', '').split(';')
+		q = []
+		for param in params:
+			flag = 0
+			for op in op_list:
+				if op in param:
+					flag = 1
+					param = param.split(op)
+					q.append({'attribute': param[0], 'operation': op, 'value': param[1]})
+					break
+			if flag == 0:
+				q.append({'attribute': param, 'operation': 'having', 'value': param})
+		data['q'] = q
+	except Exception as e:
+		app.logger.error("Error: get_q_params")
+		app.logger.error(traceback.format_exc())
+	return data
+
+
 def expand_entities_params(data, context):
 	context_list = []
 	try:
@@ -159,6 +182,12 @@ def expand_entities_params(data, context):
 					com = {"@context": context_list, "@type": data['type_data'][count]}
 					expanded = jsonld.expand(com)
 					data['type_data'][count] = expanded[0]['@type'][0]
+		if data['q']:
+			for count in range(0, len(data['q'])):
+				if data['q'][count]['operation'] != 'having' and (not validators.url(data['q'][count]['attribute'])):
+					com = {"@context": context_list, data['q'][count]['attribute']: data['q'][count]['attribute']}
+					expanded = jsonld.expand(com)
+					data['q'][count]['attribute'] = list(expanded[0].keys())[0]
 		app.logger.info(data)
 	except Exception as e:
 		app.logger.error("Error: expand_entities_params")
@@ -203,13 +232,13 @@ def build_sql_query_for_entity(data, entity_id):
 	params = {}
 	try:
 		if data['timerel'] == 'after':
-			statement = "SELECT * FROM entity WHERE observedat>%(time)s"
+			statement = "SELECT * FROM entity_table WHERE observedat>%(time)s"
 			params["time"] = data['time']
 		elif data['timerel'] == 'before':
-			statement = "SELECT * FROM entity WHERE observedat<%(time)s"
+			statement = "SELECT * FROM entity_table WHERE observedat<%(time)s"
 			params["time"] = data['time']
 		else:
-			statement = "SELECT * FROM entity WHERE observedat>=%(time)s AND observedat<%(endtime)s"
+			statement = "SELECT * FROM entity_table WHERE observedat>=%(time)s AND observedat<%(endtime)s"
 			params["time"] = data['time']
 			params["endtime"] = data['endtime']
 		statement += " AND id = %(entity_id)s order by observedat desc"
