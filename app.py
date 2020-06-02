@@ -153,6 +153,9 @@ def get_q_params(data):
           if '.' in param[0]:
             attrs = param[0].split('.')
             q.append({'attribute': attrs[0], 'operation': op, 'value': param[1], 'sub-attribute': attrs[1]})
+          elif '[' in param[0] and ']' in param[0]:
+            attrs = param[0].replace(']', '').split('[')
+            q.append({'attribute': attrs[0], 'operation': op, 'value': param[1], 'column': attrs[1]})
           else:
             q.append({'attribute': param[0], 'operation': op, 'value': param[1]})
           break
@@ -188,10 +191,14 @@ def expand_entities_params(data, context):
           data['type_data'][count] = expanded[0]['@type'][0]
     if data['q']:
       for count in range(0, len(data['q'])):
-        if data['q'][count]['operation'] != 'having' and (not validators.url(data['q'][count]['attribute'])):
-          com = {"@context": context_list, data['q'][count]['attribute']: data['q'][count]['attribute']}
+        if (not validators.url(data['q'][count]['attribute'])):
+          com = {"@context": context_list, data['q'][count]['attribute']: data['q'][count]['attribute']} 
           expanded = jsonld.expand(com)
           data['q'][count]['attribute'] = list(expanded[0].keys())[0]
+          if 'sub-attribute' in data['q'][count]:
+            com = {"@context": context_list, data['q'][count]['sub-attribute']: data['q'][count]['sub-attribute']} 
+            expanded = jsonld.expand(com)
+            data['q'][count]['sub-attribute'] = list(expanded[0].keys())[0]
     app.logger.info(data)
   except Exception as e:
     app.logger.error("Error: expand_entities_params")
@@ -218,11 +225,15 @@ def get_temporal_entity(entity_id):
       return Response("Wrong endtime value", status=400, )
     statement, params = build_sql_query_for_entity(data, entity_id)
     cursor.execute(statement,params)
+    app.logger.info(cursor.fetchall())
+    app.logger.info(type(enumerate(cursor)))
     for i, record in enumerate(cursor):
       record = list(record)
-      record[0] = record[0].strftime("%Y-%m-%dT%H:%M:%SZ")
+      # record[0] = record[0].strftime("%Y-%m-%dT%H:%M:%SZ")
       response_data.append(record)
-    response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
+    #app.logger.info(response_data)
+    #response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
+    response = app.response_class(response=response_data, status=200,mimetype='application/json')
     close_postgres_connection(cursor, conn)
     return response
   except Exception as e:
@@ -232,25 +243,36 @@ def get_temporal_entity(entity_id):
     abort(400)
 
 def build_sql_query_for_entity(data, entity_id):
-  statement = ''
+  statement = start_statement
   params = {}
   try:
     if data['timerel'] == 'after':
-      statement = "SELECT * FROM entity_table WHERE observedat>%(time)s"
+      statement += " WHERE attributes_table."+ data['timeproperty']+">%(time)s"
       params["time"] = data['time']
     elif data['timerel'] == 'before':
-      statement = "SELECT * FROM entity_table WHERE observedat<%(time)s"
+      statement += " WHERE attributes_table."+ data['timeproperty']+"<%(time)s"
       params["time"] = data['time']
     else:
-      statement = "SELECT * FROM entity_table WHERE observedat>=%(time)s AND observedat<%(endtime)s"
+      statement += " WHERE attributes_table."+ data['timeproperty']+">=%(time)s AND attributes_table."+ data['timeproperty']+"<%(endtime)s"
       params["time"] = data['time']
       params["endtime"] = data['endtime']
-    statement += " AND id = %(entity_id)s order by observedat desc"
+    if data['attrs'] and len(data['attrs']) > 0:
+      statement += ' AND attributes_table.id in ('
+      for index in range(0,len(data['attrs'])):
+        if index == (len(data['attrs']) -1):
+          statement += '%(attrs'+str(index)+')s'
+        else:
+          statement += '%(attrs'+str(index)+')s,'
+        params['attrs'+str(index)] = data['attrs'][index]
+      statement += ')'
+    statement += " AND attributes_table.entity_id = %(entity_id)s order by attributes_table."+ data['timeproperty']+" desc"
     params["entity_id"] = entity_id
     if data['lastN']:
       statement += " limit %(lastN)s"
       params["lastN"] = data['lastN'] 
     statement += "%s"%(';')
+    app.logger.info(statement)
+    app.logger.info(params)
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_entity")
     app.logger.error(traceback.format_exc())
@@ -263,7 +285,7 @@ def get_temporal_entity_parameters(args, context):
       data['timerel'] = args.get('timerel')
       data['time'] = args.get('time')
       data['endtime'] = args.get('endtime', None)
-      data['timeproperty'] = args.get('timeproperty', 'observedAt')
+      data['timeproperty'] = args.get('timeproperty', 'modified_at')
       data['time'] = datetime.datetime.strptime(data['time'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
       if data['endtime']:
         data['endtime'] = datetime.datetime.strptime(data['endtime'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
@@ -271,6 +293,9 @@ def get_temporal_entity_parameters(args, context):
       data['attrs'] = args.get('attrs').split(',')
     if 'lastN' in args and args.get('lastN'):
       data['lastN'] = args.get('lastN')
+    if data['timeproperty'] not in ['modified_at', 'observed_at', 'created_at']:
+      data['timeproperty'] = 'modified_at'
+    app.logger.info(data)
     data = expand_entity_params(data, context)
   except Exception as e:
     app.logger.error("Error: get_temporal_entity_parameters")
@@ -347,6 +372,7 @@ def load_context(context):
     app.logger.error("Error: load_context")
     app.logger.error(traceback.format_exc())
 
+start_statement = "SELECT entity_table.entity_id as entity_id, entity_table.entity_type as entity_type,ST_AsGeoJSON(entity_table.geo_property) as entity_geo_property,to_char(entity_table.created_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as entity_created_at,to_char(entity_table.modified_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as entity_modified_at, to_char(entity_table.observed_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as entity_observed_at, attributes_table.name as attribute_name, attributes_table.id as attribute_id, attributes_table.value_type as attribute_value_type, attributes_table.sub_property as attribute_sub_property, attributes_table.unit_code as attribute_unit_code, attributes_table.data_set_id as attribute_data_set_id, attributes_table.instance_id as attribute_instance_id, attributes_table.value_string as attribute_value_string, attributes_table.value_boolean as attribute_value_boolean, attributes_table.value_number as attribute_value_number, attributes_table.value_relation as attribute_value_relation, attributes_table.value_object as attribute_value_object, ST_AsGeoJSON(attributes_table.geo_property) as attribute_geo_property, to_char(attributes_table.created_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_created_at, to_char(attributes_table.modified_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_modified_at, to_char(attributes_table.observed_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_observed_at, attribute_sub_properties_table.name as subattribute_name, attribute_sub_properties_table.id as subattribute_id, attribute_sub_properties_table.value_type as subattribute_value_type, attribute_sub_properties_table.value_string as subattribute_value_string, attribute_sub_properties_table.value_boolean as subattribute_value_boolean, attribute_sub_properties_table.value_number as subattribute_value_number, attribute_sub_properties_table.value_relation as subattribute_value_relation, ST_AsGeoJSON(attribute_sub_properties_table.geo_property) as subattribute_geo_property, attribute_sub_properties_table.value_object as subattribute_value_object,attribute_sub_properties_table.unit_code as subattribute_unit_code from attributes_table FULL OUTER JOIN entity_table ON entity_table.entity_id = attributes_table.entity_id FULL OUTER JOIN attribute_sub_properties_table ON attribute_sub_properties_table.attribute_instance_id = attributes_table.instance_id"
 
 default_context = 'https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld'
 load_context(default_context)
