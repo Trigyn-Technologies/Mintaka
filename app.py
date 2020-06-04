@@ -225,15 +225,12 @@ def get_temporal_entity(entity_id):
       return Response("Wrong endtime value", status=400, )
     statement, params = build_sql_query_for_entity(data, entity_id)
     cursor.execute(statement,params)
-    app.logger.info(cursor.fetchall())
-    app.logger.info(type(enumerate(cursor)))
-    for i, record in enumerate(cursor):
-      record = list(record)
-      # record[0] = record[0].strftime("%Y-%m-%dT%H:%M:%SZ")
-      response_data.append(record)
-    #app.logger.info(response_data)
-    #response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
-    response = app.response_class(response=response_data, status=200,mimetype='application/json')
+    record = cursor.fetchall()
+    if len(record):
+      response_data = build_response_data_for_entity(record, context, data)
+    else:
+      response_data = {}
+    response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
     close_postgres_connection(cursor, conn)
     return response
   except Exception as e:
@@ -241,6 +238,43 @@ def get_temporal_entity(entity_id):
     app.logger.error("Error: get_temporal_entity")
     app.logger.error(traceback.format_exc())
     abort(400)
+
+def build_response_data_for_entity(record, context, data):
+  response_data = {}
+  try:
+    first = record[0]
+    response_data['id'] = first[0]
+    response_data['type'] = compact_entity_params(first[1], context)
+    if context:
+      response_data['@context'] = [context, default_context]
+    else:
+      response_data['@context'] = default_context
+  except Exception as e:
+    app.logger.error("Error: build_response_data_for_entity")
+    app.logger.error(traceback.format_exc())
+  return response_data
+
+def compact_entity_params(attr, context):
+  context_list = []
+  default_context_compact = 'https://uri.etsi.org/ngsi-ld/default-context/'
+  try:
+    if default_context_compact in attr:
+      attr = attr.replace(default_context_compact, '')
+      return attr
+    if context:
+      if context in app.context_dict.keys():
+        context_list.append(app.context_dict[context])
+      else:
+        context_list.append(context)
+    context_list.append(app.context_dict[default_context])
+    con = {"@context": context_list}
+    com =  {attr: attr}
+    compacted = jsonld.compact(com, con)
+    attr = list(compacted.keys())[1]
+  except Exception as e:
+    app.logger.error("Error: compact_entity_params")
+    app.logger.error(traceback.format_exc())
+  return attr
 
 def build_sql_query_for_entity(data, entity_id):
   statement = start_statement
@@ -295,7 +329,8 @@ def get_temporal_entity_parameters(args, context):
       data['lastN'] = args.get('lastN')
     if data['timeproperty'] not in ['modified_at', 'observed_at', 'created_at']:
       data['timeproperty'] = 'modified_at'
-    app.logger.info(data)
+    if 'options' in args and args.get('options'):
+      data['options'] = args.get('options')
     data = expand_entity_params(data, context)
   except Exception as e:
     app.logger.error("Error: get_temporal_entity_parameters")
