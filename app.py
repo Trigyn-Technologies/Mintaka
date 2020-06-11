@@ -270,8 +270,8 @@ def build_response_data_for_entity(record, context, data):
 
 def build_normal_response_data_for_entity(record_list, response_data, context):
   compacted_dict = {}
-  attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21}
-  subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31}
+  attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32}
+  subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
   try:
     for record in record_list:
       attr = compact_entity_params(record[attr_val['id']], context, compacted_dict)
@@ -293,6 +293,9 @@ def build_normal_response_data_for_entity(record_list, response_data, context):
       elif record[attr_val['value_type']] == 'value_relation':
         attr_dict['type'] = 'Relationship'
         attr_dict['object'] = record[attr_val['value_relation']]
+      elif record[attr_val['value_type']] == 'value_datetime':
+        attr_dict['type'] = 'Property'
+        attr_dict['object'] = {"@type": "DateTime","@value":record[attr_val['value_datetime']].replace(' ', '')}
       elif record[attr_val['value_type']] == 'value_object':
         attr_dict['type'] = 'Property'
         try:
@@ -324,6 +327,9 @@ def build_normal_response_data_for_entity(record_list, response_data, context):
         elif record[subattr_val['value_type']] == 'value_number':
           subattr_dict['type'] = 'Property'
           subattr_dict['value'] = record[subattr_val['value_number']]
+        elif record[subattr_val['value_type']] == 'value_datetime':
+          subattr_dict['type'] = 'Property'
+          subattr_dict['value'] = {"@type": "DateTime","@value":record[subattr_val['value_datetime']].replace(' ', '')}
         elif record[subattr_val['value_type']] == 'value_relation':
           subattr_dict['type'] = 'Relationship'
           subattr_dict['object'] = record[subattr_val['value_relation']]
@@ -346,8 +352,8 @@ def build_normal_response_data_for_entity(record_list, response_data, context):
 
 def build_temporal_response_data_for_entity(record_list, response_data, context, data):
   compacted_dict = {}
-  attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21}
-  subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31}
+  attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32}
+  subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
   try:
     for record in record_list:
       attr = compact_entity_params(record[attr_val['id']], context, compacted_dict)
@@ -369,6 +375,9 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
       elif record[attr_val['value_type']] == 'value_relation':
         response_data[attr]['type'] = 'Relationship'
         attr_list.append(record[attr_val['value_relation']])
+      elif record[attr_val['value_type']] == 'value_datetime':
+        response_data[attr]['type'] = 'Property'
+        attr_list.append(record[attr_val['value_datetime']].replace(' ', ''))
       elif record[attr_val['value_type']] == 'value_object':
         response_data[attr]['type'] = 'Property'
         try:
@@ -419,6 +428,9 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
         elif record[subattr_val['value_type']] == 'value_relation':
           response_data[attr][subattr]['type'] = 'Relationship'
           response_data[attr][subattr]['value'].append(record[subattr_val['value_relation']])
+        elif record[subattr_val['value_type']] == 'value_datetime':
+          response_data[attr][subattr]['type'] = 'Property'
+          response_data[attr][subattr]['value'].append(record[subattr_val['value_datetime']].replace(' ', ''))
         elif record[subattr_val['value_type']] == 'value_object':
           response_data[attr][subattr]['type'] = 'Property'
           try:
@@ -436,12 +448,14 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
 
 def compact_entity_params(attr, context, compacted_dict = {}):
   context_list = []
+  attr_key = attr
   default_context_compact = 'https://uri.etsi.org/ngsi-ld/default-context/'
   try:
     if attr in compacted_dict:
       return compacted_dict[attr]
     if default_context_compact in attr:
       attr = attr.replace(default_context_compact, '')
+      compacted_dict[attr_key] = attr
       return attr
     if context:
       if context in app.context_dict.keys():
@@ -453,6 +467,7 @@ def compact_entity_params(attr, context, compacted_dict = {}):
     com =  {attr: attr}
     compacted = jsonld.compact(com, con)
     attr = list(compacted.keys())[1]
+    compacted_dict[attr_key] = attr
   except Exception as e:
     app.logger.error("Error: compact_entity_params")
     app.logger.error(traceback.format_exc())
@@ -591,7 +606,7 @@ def load_context(context):
     app.logger.error("Error: load_context")
     app.logger.error(traceback.format_exc())
 
-start_statement = "SELECT entity_table.entity_id as entity_id, entity_table.entity_type as entity_type,ST_AsGeoJSON(entity_table.geo_property) as entity_geo_property,to_char(entity_table.created_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as entity_created_at,to_char(entity_table.modified_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as entity_modified_at, to_char(entity_table.observed_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as entity_observed_at, attributes_table.name as attribute_name, attributes_table.id as attribute_id, attributes_table.value_type as attribute_value_type, attributes_table.sub_property as attribute_sub_property, attributes_table.unit_code as attribute_unit_code, attributes_table.data_set_id as attribute_data_set_id, attributes_table.instance_id as attribute_instance_id, attributes_table.value_string as attribute_value_string, attributes_table.value_boolean as attribute_value_boolean, attributes_table.value_number as attribute_value_number, attributes_table.value_relation as attribute_value_relation, attributes_table.value_object as attribute_value_object, ST_AsGeoJSON(attributes_table.geo_property) as attribute_geo_property, to_char(attributes_table.created_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_created_at, to_char(attributes_table.modified_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_modified_at, to_char(attributes_table.observed_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_observed_at, attribute_sub_properties_table.name as subattribute_name, attribute_sub_properties_table.id as subattribute_id, attribute_sub_properties_table.value_type as subattribute_value_type, attribute_sub_properties_table.value_string as subattribute_value_string, attribute_sub_properties_table.value_boolean as subattribute_value_boolean, attribute_sub_properties_table.value_number as subattribute_value_number, attribute_sub_properties_table.value_relation as subattribute_value_relation, ST_AsGeoJSON(attribute_sub_properties_table.geo_property) as subattribute_geo_property, attribute_sub_properties_table.value_object as subattribute_value_object,attribute_sub_properties_table.unit_code as subattribute_unit_code from attributes_table FULL OUTER JOIN entity_table ON entity_table.entity_id = attributes_table.entity_id FULL OUTER JOIN attribute_sub_properties_table ON attribute_sub_properties_table.attribute_instance_id = attributes_table.instance_id"
+start_statement = "SELECT entity_table.entity_id as entity_id, entity_table.entity_type as entity_type,ST_AsGeoJSON(entity_table.geo_property) as entity_geo_property,to_char(entity_table.created_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as entity_created_at,to_char(entity_table.modified_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as entity_modified_at, to_char(entity_table.observed_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as entity_observed_at, attributes_table.name as attribute_name, attributes_table.id as attribute_id, attributes_table.value_type as attribute_value_type, attributes_table.sub_property as attribute_sub_property, attributes_table.unit_code as attribute_unit_code, attributes_table.data_set_id as attribute_data_set_id, attributes_table.instance_id as attribute_instance_id, attributes_table.value_string as attribute_value_string, attributes_table.value_boolean as attribute_value_boolean, attributes_table.value_number as attribute_value_number, attributes_table.value_relation as attribute_value_relation, attributes_table.value_object as attribute_value_object, ST_AsGeoJSON(attributes_table.geo_property) as attribute_geo_property, to_char(attributes_table.created_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_created_at, to_char(attributes_table.modified_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_modified_at, to_char(attributes_table.observed_at, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_observed_at, attribute_sub_properties_table.name as subattribute_name, attribute_sub_properties_table.id as subattribute_id, attribute_sub_properties_table.value_type as subattribute_value_type, attribute_sub_properties_table.value_string as subattribute_value_string, attribute_sub_properties_table.value_boolean as subattribute_value_boolean, attribute_sub_properties_table.value_number as subattribute_value_number, attribute_sub_properties_table.value_relation as subattribute_value_relation, ST_AsGeoJSON(attribute_sub_properties_table.geo_property) as subattribute_geo_property, attribute_sub_properties_table.value_object as subattribute_value_object,attribute_sub_properties_table.unit_code as subattribute_unit_code, to_char(attributes_table.value_datetime, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as attribute_value_datetime, to_char(attribute_sub_properties_table.value_datetime, 'YYYY-MM-DD T HH24:MI:SS.MSZ') as subattribute_value_datetime from attributes_table FULL OUTER JOIN entity_table ON entity_table.entity_id = attributes_table.entity_id FULL OUTER JOIN attribute_sub_properties_table ON attribute_sub_properties_table.attribute_instance_id = attributes_table.instance_id"
 
 default_context = 'https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld'
 load_context(default_context)
