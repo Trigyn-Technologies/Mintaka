@@ -28,7 +28,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=orion_ld
-      - POSTGRES_HOST=192.168.0.108
+      - POSTGRES_HOST=192.168.0.110
       - FLASK_APP=/app.py
 
     depends_on:
