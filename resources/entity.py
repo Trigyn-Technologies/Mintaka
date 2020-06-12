@@ -3,8 +3,11 @@ import traceback
 from resources.postgres import start_statement
 from resources.context import default_context
 import datetime
+import validators
+from pyld import jsonld
 
 def build_response_data_for_entity(record, context, data, app):
+  """Build response for entity api"""
   response_data = {}
   entity_val = {'id': 0, 'type':1, 'location':2 ,'createdAt':3, 'modifiedAt':4, 'observedAt':5}
   try:
@@ -33,8 +36,11 @@ def build_response_data_for_entity(record, context, data, app):
   return response_data
 
 def build_normal_response_data_for_entity(record_list, response_data, context, app):
+  """Build response if options = None"""
   compacted_dict = {}
-  attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32}
+  attrs_list = []
+  attrs_index = []
+  attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'instance_id':12, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32 }
   subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
   try:
     for record in record_list:
@@ -76,6 +82,10 @@ def build_normal_response_data_for_entity(record_list, response_data, context, a
         attr_dict['modifiedAt'] = record[attr_val['modifiedAt']].replace(' ', '')
       if record[attr_val['observedAt']]:
         attr_dict['observedAt'] = record[attr_val['observedAt']].replace(' ', '')
+      if record[attr_val['instance_id']] not in attrs_list:
+        attrs_list.append(record[attr_val['instance_id']])
+        response_data[attr].append(attr_dict)
+        attrs_index.append(len(response_data[attr]) -1)
       if record[attr_val['sub_property']] and record[subattr_val['id']]:
         subattr = compact_entity_params(record[subattr_val['id']], context, compacted_dict, app)
         subattr_dict = {}
@@ -107,14 +117,15 @@ def build_normal_response_data_for_entity(record_list, response_data, context, a
           subattr_dict['unitCode'] = record[subattr_val['unit_code']]
         if record[subattr_val['location']]:
           subattr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[subattr_val['location']])}
-        attr_dict[subattr] = subattr_dict
-      response_data[attr].append(attr_dict)
+        index = attrs_list.index(record[attr_val['instance_id']])
+        response_data[attr][attrs_index[index]][subattr] = subattr_dict
   except Exception as e:
     app.logger.error("Error: build_normal_response_data_for_entity")
     app.logger.error(traceback.format_exc())
   return response_data
 
 def build_temporal_response_data_for_entity(record_list, response_data, context, data, app):
+  """Building response if options = Temporalvalues"""
   compacted_dict = {}
   attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32}
   subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
@@ -163,15 +174,17 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
           attr_list.append(record[attr_val['modifiedAt']].replace(' ', ''))
         else:
           attr_list.append('')
-      if record[attr_val['unit_code']]:
-        response_data[attr]['unitCode'].append(record[attr_val['unit_code']])
-      else:
-        response_data[attr]['unitCode'].append('')
-      if record[attr_val['location']]:
-        response_data[attr]['location']['value'].append(json.loads(record[attr_val['location']]))
-      else:
-        response_data[attr]['location']['value'].append('')
-      response_data[attr]['value'].append(attr_list)
+      
+      if attr_list not in response_data[attr]['value']:
+        response_data[attr]['value'].append(attr_list)
+        if record[attr_val['unit_code']]:
+          response_data[attr]['unitCode'].append(record[attr_val['unit_code']])
+        else:
+          response_data[attr]['unitCode'].append('')
+        if record[attr_val['location']]:
+          response_data[attr]['location']['value'].append(json.loads(record[attr_val['location']]))
+        else:
+          response_data[attr]['location']['value'].append('')
       if record[attr_val['sub_property']] and record[subattr_val['id']]:
         subattr = compact_entity_params(record[subattr_val['id']], context, compacted_dict, app)
         if subattr not in response_data[attr].keys():
@@ -211,6 +224,7 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
   return response_data
 
 def compact_entity_params(attr, context, compacted_dict, app):
+  """Apply compaction output"""
   context_list = []
   attr_key = attr
   default_context_compact = 'https://uri.etsi.org/ngsi-ld/default-context/'
@@ -238,6 +252,7 @@ def compact_entity_params(attr, context, compacted_dict, app):
   return attr
 
 def build_sql_query_for_entity(data, entity_id, app):
+  """Build sql query"""
   statement = start_statement
   params = {}
   try:
@@ -272,6 +287,7 @@ def build_sql_query_for_entity(data, entity_id, app):
   return statement, params
 
 def get_temporal_entity_parameters(args, context, app):
+  """Parse params"""
   data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None}
   timepropertyDict = {'modifiedAt':'modified_at', 'observedAt' :'observed_at', 'createdAt':'created_at'}
   try:
@@ -301,6 +317,7 @@ def get_temporal_entity_parameters(args, context, app):
   return data
 
 def expand_entity_params(data, context, app):
+  """Expand entity params"""
   context_list = []
   try:
     if context:
