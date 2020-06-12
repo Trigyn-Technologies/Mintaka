@@ -35,8 +35,45 @@ def build_response_data_for_entity(record, context, data, app):
     app.logger.error(traceback.format_exc())
   return response_data
 
+def get_normal_value_string(record, attr_val, attr_dict):
+  attr_dict['type'] = 'Property'
+  attr_dict['value'] = record[attr_val['value_string']]
+  return attr_dict
+
+def get_normal_value_boolean(record, attr_val, attr_dict):
+  attr_dict['type'] = 'Property'
+  if record[attr_val['value_boolean']]:
+    attr_dict['value'] = 'true'
+  else:
+    attr_dict['value'] = 'false'
+  return attr_dict
+
+def get_normal_value_relation(record, attr_val, attr_dict):
+  attr_dict['type'] = 'Relationship'
+  attr_dict['object'] = record[attr_val['value_relation']]
+  return attr_dict
+
+def get_normal_value_number(record, attr_val, attr_dict):
+  attr_dict['type'] = 'Property'
+  attr_dict['value'] = record[attr_val['value_number']]
+  return attr_dict
+
+def get_normal_value_object(record, attr_val, attr_dict):
+  attr_dict['type'] = 'Property'
+  try:
+    attr_dict['value'] = json.loads(record[attr_val['value_object']])
+  except:
+    attr_dict['value'] = record[attr_val['value_object']]
+  return attr_dict
+
+def get_normal_value_datetime(record, attr_val, attr_dict):
+  attr_dict['type'] = 'Property'
+  attr_dict['object'] = {"@type": "DateTime","@value":record[attr_val['value_datetime']].replace(' ', '')}
+  return attr_dict
+
 def build_normal_response_data_for_entity(record_list, response_data, context, app):
   """Build response if options = None"""
+  get_attr_val_dict = {'value_string': get_normal_value_string,  'value_boolean': get_normal_value_boolean, 'value_number':get_normal_value_number, 'value_relation': get_normal_value_relation, 'value_object':get_normal_value_object,'value_datetime':get_normal_value_datetime}
   compacted_dict = {}
   attrs_list = []
   attrs_index = []
@@ -48,30 +85,8 @@ def build_normal_response_data_for_entity(record_list, response_data, context, a
       if attr not in response_data.keys():
         response_data[attr] = []
       attr_dict = {}
-      if record[attr_val['value_type']] == 'value_string':
-        attr_dict['type'] = 'Property'
-        attr_dict['value'] = record[attr_val['value_string']]
-      elif record[attr_val['value_type']] == 'value_boolean':
-        attr_dict['type'] = 'Property'
-        if record[attr_val['value_boolean']]:
-          attr_dict['value'] = 'true'
-        else:
-          attr_dict['value'] = 'false'
-      elif record[attr_val['value_type']] == 'value_number':
-        attr_dict['type'] = 'Property'
-        attr_dict['value'] = record[attr_val['value_number']]
-      elif record[attr_val['value_type']] == 'value_relation':
-        attr_dict['type'] = 'Relationship'
-        attr_dict['object'] = record[attr_val['value_relation']]
-      elif record[attr_val['value_type']] == 'value_datetime':
-        attr_dict['type'] = 'Property'
-        attr_dict['object'] = {"@type": "DateTime","@value":record[attr_val['value_datetime']].replace(' ', '')}
-      elif record[attr_val['value_type']] == 'value_object':
-        attr_dict['type'] = 'Property'
-        try:
-          attr_dict['value'] = json.loads(record[attr_val['value_object']])
-        except:
-          attr_dict['value'] = record[attr_val['value_object']]
+      if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+        attr_dict = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_dict)
       if record[attr_val['unit_code']]:
         attr_dict['unitCode'] = record[attr_val['unit_code']]
       if record[attr_val['location']]:
@@ -89,30 +104,8 @@ def build_normal_response_data_for_entity(record_list, response_data, context, a
       if record[attr_val['sub_property']] and record[subattr_val['id']]:
         subattr = compact_entity_params(record[subattr_val['id']], context, compacted_dict, app)
         subattr_dict = {}
-        if record[subattr_val['value_type']] == 'value_string':
-          subattr_dict['type'] = 'Property'
-          subattr_dict['value'] = record[subattr_val['value_string']]
-        elif record[subattr_val['value_type']] == 'value_boolean':
-          subattr_dict['type'] = 'Property'
-          if record[subattr_val['value_boolean']]:
-            subattr_dict['value'] = 'true'
-          else:
-            subattr_dict['value'] = 'false'
-        elif record[subattr_val['value_type']] == 'value_number':
-          subattr_dict['type'] = 'Property'
-          subattr_dict['value'] = record[subattr_val['value_number']]
-        elif record[subattr_val['value_type']] == 'value_datetime':
-          subattr_dict['type'] = 'Property'
-          subattr_dict['value'] = {"@type": "DateTime","@value":record[subattr_val['value_datetime']].replace(' ', '')}
-        elif record[subattr_val['value_type']] == 'value_relation':
-          subattr_dict['type'] = 'Relationship'
-          subattr_dict['object'] = record[subattr_val['value_relation']]
-        elif record[subattr_val['value_type']] == 'value_object':
-          subattr_dict['type'] = 'Property'
-          try:
-            subattr_dict['value'] = json.loads(record[subattr_val['value_object']])
-          except:
-            subattr_dict['value'] = record[subattr_val['value_object']]
+        if record[subattr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+          subattr_dict = get_attr_val_dict[record[subattr_val['value_type']]](record, subattr_val, subattr_dict)
         if record[subattr_val['unit_code']]:
           subattr_dict['unitCode'] = record[subattr_val['unit_code']]
         if record[subattr_val['location']]:
@@ -124,8 +117,45 @@ def build_normal_response_data_for_entity(record_list, response_data, context, a
     app.logger.error(traceback.format_exc())
   return response_data
 
+def get_temporal_value_string(record, attr_val, attr_list, response_data, attr):
+  response_data[attr]['type'] = 'Property'
+  attr_list.append(record[attr_val['value_string']])
+  return attr_list
+
+def get_temporal_value_boolean(record, attr_val, attr_list, response_data, attr):
+  response_data[attr]['type'] = 'Property'
+  if record[attr_val['value_boolean']]:
+    attr_list.append('true')
+  else:
+    attr_list.append('false')
+  return attr_list
+
+def get_temporal_value_number(record, attr_val, attr_list, response_data, attr):
+  response_data[attr]['type'] = 'Property'
+  attr_list.append(record[attr_val['value_number']])
+  return attr_list
+
+def get_temporal_value_object(record, attr_val, attr_list, response_data, attr):
+  response_data[attr]['type'] = 'Property'
+  try:
+    attr_list.append(json.loads(record[attr_val['value_object']]))
+  except:
+    attr_list.append(record[attr_val['value_object']])
+  return attr_list
+
+def get_temporal_value_relation(record, attr_val, attr_list, response_data, attr):
+  response_data[attr]['type'] = 'Relationship'
+  attr_list.append(record[attr_val['value_relation']])
+  return attr_list
+
+def get_temporal_value_datetime(record, attr_val, attr_list, response_data, attr):
+  response_data[attr]['type'] = 'Property'
+  attr_list.append(record[attr_val['value_datetime']].replace(' ', ''))
+  return attr_list
+
 def build_temporal_response_data_for_entity(record_list, response_data, context, data, app):
   """Building response if options = Temporalvalues"""
+  get_attr_val_dict = {'value_string': get_temporal_value_string,  'value_boolean': get_temporal_value_boolean, 'value_number':get_temporal_value_number, 'value_relation': get_temporal_value_relation, 'value_object':get_temporal_value_object,'value_datetime':get_temporal_value_datetime}
   compacted_dict = {}
   attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32}
   subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
@@ -134,31 +164,9 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
       attr = compact_entity_params(record[attr_val['id']], context, compacted_dict, app)
       if attr not in response_data.keys():
         response_data[attr] = {'type': '', 'value': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'value': []}}
-      attr_list = [] 
-      if record[attr_val['value_type']] == 'value_string':
-        response_data[attr]['type'] = 'Property'
-        attr_list.append(record[attr_val['value_string']])
-      elif record[attr_val['value_type']] == 'value_boolean':
-        response_data[attr]['type'] = 'Property'
-        if record[attr_val['value_boolean']]:
-          attr_list.append('true')
-        else:
-         attr_list.append('false')
-      elif record[attr_val['value_type']] == 'value_number':
-        response_data[attr]['type'] = 'Property'
-        attr_list.append(record[attr_val['value_number']])
-      elif record[attr_val['value_type']] == 'value_relation':
-        response_data[attr]['type'] = 'Relationship'
-        attr_list.append(record[attr_val['value_relation']])
-      elif record[attr_val['value_type']] == 'value_datetime':
-        response_data[attr]['type'] = 'Property'
-        attr_list.append(record[attr_val['value_datetime']].replace(' ', ''))
-      elif record[attr_val['value_type']] == 'value_object':
-        response_data[attr]['type'] = 'Property'
-        try:
-         attr_list.append(json.loads(record[attr_val['value_object']]))
-        except:
-          attr_list.append(record[attr_val['value_object']])
+      attr_list = []
+      if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+        attr_list = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_list, response_data, attr) 
       if data['timeproperty'] == 'created_at':
         if record[attr_val['createdAt']]:
           attr_list.append(record[attr_val['createdAt']].replace(' ', ''))
@@ -189,31 +197,8 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
         subattr = compact_entity_params(record[subattr_val['id']], context, compacted_dict, app)
         if subattr not in response_data[attr].keys():
           response_data[attr][subattr] = {'type': '', 'value': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'value': []}}
-        subattr_dict = {}
-        if record[subattr_val['value_type']] == 'value_string':
-          response_data[attr][subattr]['type'] = 'Property'
-          response_data[attr][subattr]['value'].append(record[subattr_val['value_string']])
-        elif record[subattr_val['value_type']] == 'value_boolean':
-          response_data[attr][subattr]['type'] = 'Property'
-          if record[subattr_val['value_boolean']]:
-            response_data[attr][subattr]['value'].append('true')
-          else:
-            response_data[attr][subattr]['value'].append('false')
-        elif record[subattr_val['value_type']] == 'value_number':
-          response_data[attr][subattr]['type'] = 'Property'
-          response_data[attr][subattr]['value'].append(record[subattr_val['value_number']])
-        elif record[subattr_val['value_type']] == 'value_relation':
-          response_data[attr][subattr]['type'] = 'Relationship'
-          response_data[attr][subattr]['value'].append(record[subattr_val['value_relation']])
-        elif record[subattr_val['value_type']] == 'value_datetime':
-          response_data[attr][subattr]['type'] = 'Property'
-          response_data[attr][subattr]['value'].append(record[subattr_val['value_datetime']].replace(' ', ''))
-        elif record[subattr_val['value_type']] == 'value_object':
-          response_data[attr][subattr]['type'] = 'Property'
-          try:
-            response_data[attr][subattr]['value'].append(json.loads(record[subattr_val['value_object']]))
-          except:
-            response_data[attr][subattr]['value'].append(record[subattr_val['value_object']])
+        if record[subattr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+          subattr_list = get_attr_val_dict[record[subattr_val['value_type']]](record, subattr_val, response_data[attr][subattr]['value'], response_data[attr], subattr)
         if record[subattr_val['unit_code']]:
           response_data[attr][subattr]['unitCode'].append(record[subattr_val['unit_code']])
         if record[subattr_val['location']]:
