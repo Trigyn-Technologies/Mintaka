@@ -7,8 +7,11 @@ import validators
 from pyld import jsonld
 
 def build_sql_query_for_entities(data, app):
+  """Build sql query"""
   statement = ''
   params = {}
+  status = 0
+  error = 'Error in building sql query for entities.'
   try:
     if data['timerel'] == 'after':
       statement = "SELECT * FROM entity_table WHERE observedat>%(time)s"
@@ -46,13 +49,17 @@ def build_sql_query_for_entities(data, app):
       statement += " limit %(lastN)s"
       params["lastN"] = data['lastN']  
     statement += "%s"%(";")
+    status = 1
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_entities")
     app.logger.error(traceback.format_exc())
-  return statement, params
+  return statement, params, status, error
 
 def get_temporal_entities_parameters(args, context, app):
+  """Parse params"""
   data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None, 'id_data': '', 'type_data': '','idPattern': None, 'q':None, 'csf':None, 'georel': None, 'geometry': None, 'coordinates': None, 'geoproperty': None}
+  status = 0
+  error = 'Error in getting temporal entities parameters.'
   try:
     if 'timerel' in args:
       data['timerel'] = args.get('timerel')
@@ -70,7 +77,9 @@ def get_temporal_entities_parameters(args, context, app):
       data['idPattern'] = args.get('idPattern')
     if 'q' in args and args.get('q'):
       data['q'] = args.get('q')
-      data = get_q_params(data)
+      data, status, error = get_q_params(data)
+      if not status:
+        return data, status, error
     if 'csf' in args and args.get('csf'):
       data['csf'] = args.get('csf')
     if 'georel' in args and args.get('georel'):
@@ -89,14 +98,17 @@ def get_temporal_entities_parameters(args, context, app):
       types = args.get('type')
       if types:
         data['type_data'] = types.split(',')
-    data = expand_entities_params(data, context, app)
+    data, status, error = expand_entities_params(data, context, app)
   except Exception as e:
     app.logger.error("Error: get_temporal_entities_parameters")
     app.logger.error(traceback.format_exc())
-  return data
+  return data, status, error
 
 def get_q_params(data, app):
+  """Parse q params"""
   op_list = ['==', '!=', '>=','<=','>', '<','!~=','~=', '|']
+  status = 0
+  error = 'Error in parsing q params'
   try:
     # if '(' in data['q']:
     #   return data = get_q_params_with_multiple_operations(data)
@@ -122,10 +134,11 @@ def get_q_params(data, app):
       if flag == 0:
         q.append({'attribute': param, 'operation': 'having', 'value': param})
     data['q'] = q
+    status = 1
   except Exception as e:
     app.logger.error("Error: get_q_params")
     app.logger.error(traceback.format_exc())
-  return data
+  return data, status, error
 
 def get_q_params_with_multiple_operations(data):
   op_list = ['==', '!=', '>=','<=','>', '<','!~=','~=', '..', '|']
@@ -150,7 +163,10 @@ def get_q_params_with_multiple_operations(data):
 
 
 def expand_entities_params(data, context, app):
+  """Expand entities params"""
   context_list = []
+  status = 0
+  error = 'Error in expanding entities params.'
   try:
     if context:
       if context in app.context_dict.keys():
@@ -181,7 +197,8 @@ def expand_entities_params(data, context, app):
             expanded = jsonld.expand(com)
             data['q'][count]['sub-attribute'] = list(expanded[0].keys())[0]
     app.logger.info(data)
+    status = 1
   except Exception as e:
     app.logger.error("Error: expand_entities_params")
     app.logger.error(traceback.format_exc())
-  return data
+  return data, status, error

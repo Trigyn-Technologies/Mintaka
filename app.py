@@ -20,6 +20,7 @@ app.context_dict = {}
 
 @app.route('/temporal/entities/', methods=['GET'])
 def get_temporal_entities():
+  """Get temporal entities api."""
   response_data = []
   try:
     if request.method != 'GET':
@@ -32,12 +33,16 @@ def get_temporal_entities():
     if not status:
       return Response(error, status=400, )
     cursor = conn.cursor()
-    data = get_temporal_entities_parameters(args, context, app)
+    data, status, error = get_temporal_entities_parameters(args, context, app)
+    if not status:
+      return Response(error, status=400, )
     if data['timerel'] not in ['after','before', 'between']:
       return Response("Wrong timerel property", status=400, )
     if data['timerel'] == 'between' and (not data['endtime']):
       return Response("Wrong endtime value", status=400, )
-    statement, params = build_sql_query_for_entities(data, app)
+    statement, params, status, error = build_sql_query_for_entities(data, app)
+    if not status:
+      return Response(error, status=400, )
     cursor.execute(statement, params)
     for i, record in enumerate(cursor):
       record = list(record)
@@ -57,6 +62,7 @@ def get_temporal_entities():
 
 @app.route('/temporal/entities/<entity_id>/', methods=['GET'])
 def get_temporal_entity(entity_id):
+  """Get temporal entity api."""
   response_data = []
   try:
     if request.method != 'GET':
