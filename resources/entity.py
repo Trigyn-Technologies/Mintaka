@@ -10,6 +10,8 @@ def build_response_data_for_entity(record, context, data, app):
   """Build response for entity api"""
   response_data = {}
   entity_val = {'id': 0, 'type':1, 'location':2 ,'createdAt':3, 'modifiedAt':4, 'observedAt':5}
+  status = 0
+  error = 'Error in building response data for entity'
   try:
     first = record[0]
     response_data['id'] = first[entity_val['id']]
@@ -23,9 +25,9 @@ def build_response_data_for_entity(record, context, data, app):
     if first[entity_val['location']]:
       response_data['location'] = {"type": "GeoProperty", 'value': json.loads(first[entity_val['location']])}
     if 'options' in data and data['options'] == 'temporalValues':
-      response_data = build_temporal_response_data_for_entity(record, response_data, context, data, app)
+      response_data, status, error = build_temporal_response_data_for_entity(record, response_data, context, data, app)
     else:
-      response_data = build_normal_response_data_for_entity(record, response_data, context, app)
+      response_data, status, error = build_normal_response_data_for_entity(record, response_data, context, app)
     if context:
       response_data['@context'] = [context, default_context]
     else:
@@ -33,7 +35,7 @@ def build_response_data_for_entity(record, context, data, app):
   except Exception as e:
     app.logger.error("Error: build_response_data_for_entity")
     app.logger.error(traceback.format_exc())
-  return response_data
+  return response_data, status, error
 
 def get_normal_value_string(record, attr_val, attr_dict):
   attr_dict['type'] = 'Property'
@@ -75,6 +77,8 @@ def build_normal_response_data_for_entity(record_list, response_data, context, a
   """Build response if options = None"""
   get_attr_val_dict = {'value_string': get_normal_value_string,  'value_boolean': get_normal_value_boolean, 'value_number':get_normal_value_number, 'value_relation': get_normal_value_relation, 'value_object':get_normal_value_object,'value_datetime':get_normal_value_datetime}
   compacted_dict = {}
+  status = 0
+  error = 'Error in building normal response data for entity.'
   attrs_list = []
   attrs_index = []
   attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'instance_id':12, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32 }
@@ -112,10 +116,11 @@ def build_normal_response_data_for_entity(record_list, response_data, context, a
           subattr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[subattr_val['location']])}
         index = attrs_list.index(record[attr_val['instance_id']])
         response_data[attr][attrs_index[index]][subattr] = subattr_dict
+    status = 1
   except Exception as e:
     app.logger.error("Error: build_normal_response_data_for_entity")
     app.logger.error(traceback.format_exc())
-  return response_data
+  return response_data, status, error
 
 def get_temporal_value_string(record, attr_val, attr_list, response_data, attr):
   response_data[attr]['type'] = 'Property'
@@ -157,6 +162,8 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
   """Building response if options = Temporalvalues"""
   get_attr_val_dict = {'value_string': get_temporal_value_string,  'value_boolean': get_temporal_value_boolean, 'value_number':get_temporal_value_number, 'value_relation': get_temporal_value_relation, 'value_object':get_temporal_value_object,'value_datetime':get_temporal_value_datetime}
   compacted_dict = {}
+  status = 0
+  error = 'Error in building temporal response data for entity'
   attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32}
   subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
   try:
@@ -203,10 +210,11 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
           response_data[attr][subattr]['unitCode'].append(record[subattr_val['unit_code']])
         if record[subattr_val['location']]:
           response_data[attr][subattr]['location']['value'].append({"type": "GeoProperty", 'value': json.loads(record[subattr_val['location']])})
+    status = 1
   except Exception as e:
     app.logger.error("Error: build_temporal_response_data_for_entity")
     app.logger.error(traceback.format_exc())
-  return response_data
+  return response_data, status, error
 
 def compact_entity_params(attr, context, compacted_dict, app):
   """Apply compaction output"""
@@ -240,6 +248,8 @@ def build_sql_query_for_entity(data, entity_id, app):
   """Build sql query"""
   statement = start_statement
   params = {}
+  status = 0
+  error = 'Error in build sql query for entity.'
   try:
     if data['timerel'] == 'after':
       statement += " WHERE attributes_table."+ data['timeproperty']+">%(time)s"
@@ -266,15 +276,18 @@ def build_sql_query_for_entity(data, entity_id, app):
       statement += " limit %(lastN)s"
       params["lastN"] = data['lastN'] 
     statement += "%s"%(';')
+    status = 1
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_entity")
     app.logger.error(traceback.format_exc())
-  return statement, params
+  return statement, params, status, error
 
 def get_temporal_entity_parameters(args, context, app):
   """Parse params"""
   data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None}
   timepropertyDict = {'modifiedAt':'modified_at', 'observedAt' :'observed_at', 'createdAt':'created_at'}
+  status = 0
+  error = 'Error in getting temporal entity parameters.'
   try:
     if 'timerel' in args:
       data['timerel'] = args.get('timerel')
@@ -295,15 +308,17 @@ def get_temporal_entity_parameters(args, context, app):
       data['timeproperty'] = 'modified_at'
     if 'options' in args and args.get('options'):
       data['options'] = args.get('options')
-    data = expand_entity_params(data, context, app)
+    data, status, error = expand_entity_params(data, context, app)
   except Exception as e:
     app.logger.error("Error: get_temporal_entity_parameters")
     app.logger.error(traceback.format_exc())
-  return data
+  return data, status, error
 
 def expand_entity_params(data, context, app):
   """Expand entity params"""
   context_list = []
+  status = 0
+  error = 'Error in expand entity params.'
   try:
     if context:
       if context in app.context_dict.keys():
@@ -317,8 +332,8 @@ def expand_entity_params(data, context, app):
           com = {"@context": context_list, data['attrs'][count]: data['attrs'][count]}
           expanded = jsonld.expand(com)
           data['attrs'][count] = list(expanded[0].keys())[0]
-    app.logger.info(data)
+    status = 1
   except Exception as e:
     app.logger.error("Error: expand_entity_params")
     app.logger.error(traceback.format_exc())
-  return data
+  return data, status, error
