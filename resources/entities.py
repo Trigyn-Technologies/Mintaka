@@ -77,7 +77,7 @@ def get_temporal_entities_parameters(args, context, app):
       data['idPattern'] = args.get('idPattern')
     if 'q' in args and args.get('q'):
       data['q'] = args.get('q')
-      data, status, error = get_q_params(data)
+      data, status, error = get_q_params(data, app)
       if not status:
         return data, status, error
     if 'csf' in args and args.get('csf'):
@@ -104,62 +104,176 @@ def get_temporal_entities_parameters(args, context, app):
     app.logger.error(traceback.format_exc())
   return data, status, error
 
+def get_q_params_in_list(start, count, param, q, app):
+  """Covert q params to list"""
+  status = 0
+  error = 'Error in get q params in list'
+  try:
+    end = count
+    if end != 0 and start != (end -1):
+      dt, status, error = parse_q_single(param[start:end], app)
+      if not status:
+        return q, status, error
+      q.append(dt)
+    start = count + 1
+    end = 0
+  except Exception as e:
+    app.logger.error("Error: get_q_params_in_list")
+    app.logger.error(traceback.format_exc())
+  return start, end, status, error
+
+def parse_q_multiple(param, app):
+  """Parse q params"""
+  status = 0
+  error = 'Error in parsing q miltiple params'
+  q = []
+  q_len = len(param)
+  count = 0
+  start = 0
+  end = 0
+  try:
+    while True:
+      if param[count] == '(':
+        q.append(param[count])
+        start = count + 1
+      elif param[count] == ')':
+        start, end, status, error = get_q_params_in_list(start, count, param, q, app)
+        start = count
+        q.append(param[count])
+      elif param[count] == '|':
+        start, end, status, error = get_q_params_in_list(start, count, param, q, app)
+        q.append('OR')
+      elif param[count] == ';':
+        start, end, status, error = get_q_params_in_list(start, count, param, q, app)
+        q.append('AND')
+      elif count == (q_len -1):
+        end = count + 1
+        if end != 0:
+          dt, status, error = parse_q_single(param[start:end], app)
+          if not status:
+            return q, status, error
+          q.append(dt)
+        start = count + 1
+      count += 1
+      if count == q_len:
+        break
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: parse_q_multiple")
+    app.logger.error(traceback.format_exc())
+  return q, status, error
+
+def parse_q_single(param, app):
+  """Parse q params"""
+  op_list = ['==', '!=', '>=','<=','>', '<','!~=','~=']
+  status = 0
+  q = {}
+  error = 'Error in parsing q single params.'
+  try:
+    flag = 0
+    for op in op_list:
+      if op in param:
+        flag = 1
+        param = param.split(op)
+        if '..' in param[1]:
+          param[1] = param[1].split('..')
+          q = {'attribute': param[0], 'operation': 'range', 'value': param[1]}
+        elif '.' in param[0]:
+          attrs = param[0].split('.')
+          q = {'attribute': attrs[0], 'operation': op, 'value': param[1], 'sub-attribute': attrs[1]}
+        elif '[' in param[0] and ']' in param[0]:
+          attrs = param[0].replace(']', '').split('[')
+          q = {'attribute': attrs[0], 'operation': op, 'value': param[1], 'column': attrs[1]}
+        else:
+          q = {'attribute': param[0], 'operation': op, 'value': param[1]}
+        break
+    if flag == 0:
+      q = {'attribute': param, 'operation': 'having', 'value': param}
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: parse_q_single")
+    app.logger.error(traceback.format_exc())
+  return q, status, error
+
 def get_q_params(data, app):
   """Parse q params"""
-  op_list = ['==', '!=', '>=','<=','>', '<','!~=','~=', '|']
+  op_list = ['==', '!=', '>=','<=','>', '<','!~=','~=']
   status = 0
   error = 'Error in parsing q params'
   try:
-    # if '(' in data['q']:
-    #   return data = get_q_params_with_multiple_operations(data)
-    params = data['q'].replace(' ', '').split(';')
+    if '(' in data['q']:
+      params, status, error = split_q_params(data['q'].replace(' ', ''), app)
+      if not status:
+        return data, status, error
+    else:
+      params = data['q'].replace(' ', '').split(';')
     q = []
+    app.logger.info(params)
     for param in params:
-      flag = 0
-      for op in op_list:
-        if op in param:
-          flag = 1
-          param = param.split(op)
-          if '..' in param[1]:
-            param[1] = param[1].split('..')
-          if '.' in param[0]:
-            attrs = param[0].split('.')
-            q.append({'attribute': attrs[0], 'operation': op, 'value': param[1], 'sub-attribute': attrs[1]})
-          elif '[' in param[0] and ']' in param[0]:
-            attrs = param[0].replace(']', '').split('[')
-            q.append({'attribute': attrs[0], 'operation': op, 'value': param[1], 'column': attrs[1]})
-          else:
-            q.append({'attribute': param[0], 'operation': op, 'value': param[1]})
-          break
-      if flag == 0:
-        q.append({'attribute': param, 'operation': 'having', 'value': param})
+      if '(' in param or '|' in param:
+        dt, status, error = parse_q_multiple(param, app)
+        if not status:
+          return data, status, error
+        q.append(dt)
+      else: 
+        dt, status, error = parse_q_single(param, app)
+        if not status:
+          return data, status, error
+        q.append(dt)
     data['q'] = q
     status = 1
+    app.logger.info(data['q'])
   except Exception as e:
     app.logger.error("Error: get_q_params")
     app.logger.error(traceback.format_exc())
   return data, status, error
 
-def get_q_params_with_multiple_operations(data):
-  op_list = ['==', '!=', '>=','<=','>', '<','!~=','~=', '..', '|']
+def split_q_params(q_params, app):
+  """Parse q params"""
   q = []
+  status = 0
+  error = 'Error in split q params'
   try:
-    q_params = data['q']
+    q_params = q_params.replace(' ','')
     start = 0
     end = None
     count = 0
-    for ct in q_params:
+    countend = 0
+    q_len = len(q_params)
+    flagend = 0
+    for ct in range(0,q_len):
+      flag = 0
+      if flagend:
+        flagend = 0
+        continue
       if '(' == q_params[ct]:
-        start = ct
+        if count == 0:
+          start = ct
         count += 1
-      if count == 0 and ';' == q_params[ct]:
+      if ')' == q_params[ct]:
+        countend += 1
+      if count != 0 and countend == count and ((ct != (q_len -1) and q_params[ct+1] == ';') or ct == (q_len -1)):
+        end = ct
+        q.append(q_params[start:end+1])
+        flag = 1
+        count = countend = 0
+        if ct != (q_len -1) and q_params[ct+1] == ';':
+          start = ct + 2
+          flagend = 1
+      if flag == 0 and count == 0 and ';' == q_params[ct]:
+        end = ct
+        q.append(q_params[start:end])
+        flag = 1
+        start = ct + 1
+      if flag == 0 and ct == (q_len -1):
         end = ct + 1
         q.append(q_params[start:end])
-        start = ct + 1
+        flag = 1
+    status = 1
   except Exception as e:
-    app.logger.error("Error: get_q_params_with_multiple_operations")
+    app.logger.error("Error: split_q_params")
     app.logger.error(traceback.format_exc())
-  return data
+  return q, status, error
 
 
 def expand_entities_params(data, context, app):
@@ -196,7 +310,6 @@ def expand_entities_params(data, context, app):
             com = {"@context": context_list, data['q'][count]['sub-attribute']: data['q'][count]['sub-attribute']} 
             expanded = jsonld.expand(com)
             data['q'][count]['sub-attribute'] = list(expanded[0].keys())[0]
-    app.logger.info(data)
     status = 1
   except Exception as e:
     app.logger.error("Error: expand_entities_params")
