@@ -44,12 +44,18 @@ def get_temporal_entities():
     if not status:
       return Response(error, status=400, )
     cursor.execute(statement, params)
-    for i, record in enumerate(cursor):
-      record = list(record)
-      record[0] = record[0].strftime("%Y-%m-%dT%H:%M:%SZ")
-      response_data.append(record)
+    record = cursor.fetchall()
+    app.logger.info(len(record))
+    if len(record):
+      response_data , status, error= build_response_data_for_entity(record, context, data, app)
+      if not status:
+        return Response(error, status=400, )
+    else:
+      response_data = {}
     response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
-    close_postgres_connection(cursor, conn, app)
+    status, error = close_postgres_connection(cursor, conn, app)
+    if not status:
+      return Response(error, status=400, )
     return response
   except Exception as e:
     close_postgres_connection(cursor, conn, app)

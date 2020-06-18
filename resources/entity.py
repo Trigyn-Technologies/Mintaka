@@ -16,18 +16,22 @@ def build_response_data_for_entity(record, context, data, app):
     first = record[0]
     response_data['id'] = first[entity_val['id']]
     response_data['type'] = compact_entity_params(first[entity_val['type']], context, {} ,app)
-    if first[entity_val['createdAt']]:
-      response_data['createdAt'] = {"type": "Property",  "value": {"@type": "DateTime","@value":first[entity_val['createdAt']].replace(' ','')}}
-    if first[entity_val['modifiedAt']]:
-      response_data['modifiedAt'] = {"type": "Property",  "value": {"@type": "DateTime","@value":first[entity_val['modifiedAt']].replace(' ','')}}
-    if first[entity_val['observedAt']]:
-      response_data['observedAt'] = {"type": "Property",  "value": {"@type": "DateTime","@value":first[entity_val['observedAt']].replace(' ','')}}
+    if 'options' in data and data['options'] == 'sysAttrs':
+      if first[entity_val['createdAt']]:
+        response_data['createdAt'] = first[entity_val['createdAt']].replace(' ','')
+      if first[entity_val['modifiedAt']]:
+        response_data['modifiedAt'] = first[entity_val['modifiedAt']].replace(' ','')
+      if first[entity_val['observedAt']]:
+        response_data['observedAt'] = first[entity_val['observedAt']].replace(' ','')
+    else:
+      if first[entity_val['observedAt']]:
+        response_data['observedAt'] = first[entity_val['observedAt']].replace(' ','')
     if first[entity_val['location']]:
       response_data['location'] = {"type": "GeoProperty", 'value': json.loads(first[entity_val['location']])}
     if 'options' in data and data['options'] == 'temporalValues':
       response_data, status, error = build_temporal_response_data_for_entity(record, response_data, context, data, app)
     else:
-      response_data, status, error = build_normal_response_data_for_entity(record, response_data, context, app)
+      response_data, status, error = build_normal_response_data_for_entity(record, response_data, context, data, app)
     if context:
       response_data['@context'] = [context, default_context]
     else:
@@ -73,7 +77,7 @@ def get_normal_value_datetime(record, attr_val, attr_dict):
   attr_dict['object'] = {"@type": "DateTime","@value":record[attr_val['value_datetime']].replace(' ', '')}
   return attr_dict
 
-def build_normal_response_data_for_entity(record_list, response_data, context, app):
+def build_normal_response_data_for_entity(record_list, response_data, context, data, app):
   """Build response if options = None"""
   get_attr_val_dict = {'value_string': get_normal_value_string,  'value_boolean': get_normal_value_boolean, 'value_number':get_normal_value_number, 'value_relation': get_normal_value_relation, 'value_object':get_normal_value_object,'value_datetime':get_normal_value_datetime}
   compacted_dict = {}
@@ -296,7 +300,7 @@ def get_temporal_entity_parameters(args, context, app):
       if 'timeproperty' in args and args['timeproperty'] in timepropertyDict.keys():
         data['timeproperty'] = timepropertyDict[args['timeproperty']]
       else:
-        data['timeproperty'] = 'modified_at'
+        data['timeproperty'] = 'observed_at'
       data['time'] = datetime.datetime.strptime(data['time'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
       if data['endtime']:
         data['endtime'] = datetime.datetime.strptime(data['endtime'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")

@@ -2,29 +2,111 @@ import json
 import traceback
 from resources.postgres import start_statement
 from resources.context import default_context
+from resources.postgres import *
 import datetime
 import validators
 from pyld import jsonld
 
+def build_sql_query_for_q_for_dict_for_having(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  if 'sub-attribute' in q_params:
+    attr_value = 'attr_value_' + q_type + str(count)
+    sub_value = 'sub_value_'  + q_type + str(count)
+    st = sub_attributes_having_statement.replace('sub_value', sub_value).replace('attr_value', attr_value)
+    statement += ' AND ' + st
+    params[attr_value] = q_params['attribute']
+    params[sub_value] = q_params['sub-attribute']
+  else:
+    attr_value = 'attr_value_' + q_type + str(count)
+    st = attributes_having_statement.replace('attr_value', attr_value)
+    statement += ' AND ' + st
+    params[attr_value] = q_params['attribute']
+  return statement, params
+
+def build_sql_query_for_q_for_dict_for_range(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  if 'sub-attribute' in q_params:
+    attr_value = 'attr_value_' + q_type + str(count)
+    sub_value = 'sub_value_'  + q_type + str(count)
+    low_range_value = 'low_range_value_' + q_type + str(count)
+    high_range_value = 'high_range_value' + q_type + str(count)
+    st = sub_attributes_range_statement.replace('sub_value', sub_value).replace('attr_value', attr_value).replace('low_range_value', low_range_value).replace('high_range_value',high_range_value)
+    statement += ' AND ' + st
+    params[attr_value] = q_params['attribute']
+    params[sub_value] = q_params['sub-attribute']
+    params[low_range_value] = q_params['value'][0]
+    params[high_range_value] = q_params['value'][1]
+  else:
+    attr_value = 'attr_value_' + q_type + str(count)
+    low_range_value = 'low_range_value_' + q_type + str(count)
+    high_range_value = 'high_range_value' + q_type + str(count)
+    st = attributes_range_statement.replace('attr_value', attr_value).replace('low_range_value', low_range_value).replace('high_range_value',high_range_value)
+    statement += ' AND ' + st
+    params[attr_value] = q_params['attribute']
+    params[low_range_value] = q_params['value'][0]
+    params[high_range_value] = q_params['value'][1]
+  return statement, params
+
+def build_sql_query_for_q_for_dict(statement, params, q_params, count, q_type, app):
+  """Build sql query for q param"""
+  status = 0
+  error = 'Error in building sql query for entities for q param.'
+  try:
+    if q_params['operation'] == 'having':
+      statement, params = build_sql_query_for_q_for_dict_for_having(statement, params, q_params, count, q_type)
+    elif q_params['operation'] == 'range':
+      statement, params = build_sql_query_for_q_for_dict_for_range(statement, params, q_params, count, q_type)
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: build_sql_query_for_q_for_dict")
+    app.logger.error(traceback.format_exc())
+  return statement, params, status, error
+
+def build_sql_query_for_q(statement, params, q_params, app):
+  """Build sql query for q param"""
+  status = 0
+  q_dict = 'q_dict'
+  error = 'Error in building sql query for entities for q param.'
+  try:
+    for count in range(0, len(q_params)):
+      if type(q_params[count]) is dict:
+        statement, params, status, error = build_sql_query_for_q_for_dict(statement, params, q_params[count], count, q_dict, app)
+        if not status:
+          return statement, params, status, error
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: build_sql_query_for_q")
+    app.logger.error(traceback.format_exc())
+  return statement, params, status, error
+
 def build_sql_query_for_entities(data, app):
   """Build sql query"""
-  statement = ''
+  statement = start_statement
   params = {}
   status = 0
   error = 'Error in building sql query for entities.'
   try:
     if data['timerel'] == 'after':
-      statement = "SELECT * FROM entity_table WHERE observedat>%(time)s"
+      statement += " WHERE entity_table."+ data['timeproperty']+">%(time)s"
       params["time"] = data['time']
     elif data['timerel'] == 'before':
-      statement = "SELECT * FROM entity_table WHERE observedat<%(time)s"
+      statement += " WHERE entity_table."+ data['timeproperty']+"<%(time)s"
       params["time"] = data['time']
     else:
-      statement = "SELECT * FROM entity_table WHERE observedat>=%(time)s AND observedat<%(endtime)s"
+      statement += " WHERE entity_table."+ data['timeproperty']+">=%(time)s AND entity_table."+ data['timeproperty']+"<%(endtime)s"
       params["time"] = data['time']
       params["endtime"] = data['endtime']
+    if data['attrs'] and len(data['attrs']) > 0:
+      statement += ' AND attributes_table.id in ('
+      for index in range(0,len(data['attrs'])):
+        if index == (len(data['attrs']) -1):
+          statement += '%(attrs'+str(index)+')s'
+        else:
+          statement += '%(attrs'+str(index)+')s,'
+        params['attrs'+str(index)] = data['attrs'][index]
+      statement += ')'
     if data['id_data'] and len(data['id_data']) > 0:
-      statement += ' AND lower(id) in ('
+      statement += ' AND entity_table.entity_id in ('
       for index in range(0,len(data['id_data'])):
         if index == (len(data['id_data']) -1):
           statement += '%(id_data'+str(index)+')s'
@@ -33,7 +115,7 @@ def build_sql_query_for_entities(data, app):
         params['id_data'+str(index)] = data['id_data'][index]
       statement += ')'
     if data['type_data'] and len(data['type_data']) > 0:
-      statement += ' AND lower(type) in ('
+      statement += ' AND entity_table.entity_type in ('
       for index in range(0,len(data['type_data'])):
         if index == (len(data['type_data']) -1):
           statement += '%(type_data'+str(index)+')s'
@@ -42,14 +124,20 @@ def build_sql_query_for_entities(data, app):
         params['type_data'+str(index)] = data['type_data'][index]
       statement += ')'
     if data['idPattern']:
-      statement += " AND lower(id) like %(idPattern)s"
-      params["idPattern"] = '%{}%'.format(data['idPattern'].lower())
-    statement +=" order by observedat desc"
+      statement += " AND entity_table.entity_id like %(idPattern)s"
+      params["idPattern"] = '%{}%'.format(data['idPattern'])
+    if data['q']:
+      statement, params, status, error = build_sql_query_for_q(statement, params, data['q'], app)
+      if not status:
+        return statement, params, status, error
+    statement +=" order by entity_table."+ data['timeproperty']+" desc"
     if data['lastN']:
       statement += " limit %(lastN)s"
       params["lastN"] = data['lastN']  
     statement += "%s"%(";")
     status = 1
+    app.logger.info(statement)
+    app.logger.info(params)
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_entities")
     app.logger.error(traceback.format_exc())
@@ -58,6 +146,7 @@ def build_sql_query_for_entities(data, app):
 def get_temporal_entities_parameters(args, context, app):
   """Parse params"""
   data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None, 'id_data': '', 'type_data': '','idPattern': None, 'q':None, 'csf':None, 'georel': None, 'geometry': None, 'coordinates': None, 'geoproperty': None}
+  timepropertyDict = {'modifiedAt':'modified_at', 'observedAt' :'observed_at', 'createdAt':'created_at'}
   status = 0
   error = 'Error in getting temporal entities parameters.'
   try:
@@ -65,7 +154,10 @@ def get_temporal_entities_parameters(args, context, app):
       data['timerel'] = args.get('timerel')
       data['time'] = args.get('time')
       data['endtime'] = args.get('endtime', None)
-      data['timeproperty'] = args.get('timeproperty', 'observedAt')
+      if 'timeproperty' in args and args['timeproperty'] in timepropertyDict.keys():
+        data['timeproperty'] = timepropertyDict[args['timeproperty']]
+      else:
+        data['timeproperty'] = 'observed_at'
       data['time'] = datetime.datetime.strptime(data['time'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
       if data['endtime']:
         data['endtime'] = datetime.datetime.strptime(data['endtime'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
@@ -91,7 +183,7 @@ def get_temporal_entities_parameters(args, context, app):
     if 'geoproperty' in args and args.get('geoproperty'):
       data['geoproperty'] = args.get('geoproperty')
     if 'id' in args:
-      ids = args.get('id').lower()
+      ids = args.get('id')
       if ids:
         data['id_data'] = ids.split(',') 
     if 'type' in args:
@@ -175,10 +267,7 @@ def parse_q_single(param, app):
       if op in param:
         flag = 1
         param = param.split(op)
-        if '..' in param[1]:
-          param[1] = param[1].split('..')
-          q = {'attribute': param[0], 'operation': 'range', 'value': param[1]}
-        elif '.' in param[0]:
+        if '.' in param[0]:
           attrs = param[0].split('.')
           q = {'attribute': attrs[0], 'operation': op, 'value': param[1], 'sub-attribute': attrs[1]}
         elif '[' in param[0] and ']' in param[0]:
@@ -188,7 +277,20 @@ def parse_q_single(param, app):
           q = {'attribute': param[0], 'operation': op, 'value': param[1]}
         break
     if flag == 0:
-      q = {'attribute': param, 'operation': 'having', 'value': param}
+      if '..' in param:
+        param = param.split('=')
+        param[1] = param[1].split('..')
+        if '.' in param[0]:
+          attrs = param[0].split('.')
+          q = {'attribute': attrs[0], 'operation': 'range', 'value': param[1], 'sub-attribute': attrs[1]}
+        else:
+          q = {'attribute': param[0], 'operation': 'range', 'value': param[1]}
+      else:
+        if '.' in param:
+          attrs = param.split('.')
+          q = {'attribute': attrs[0], 'operation': 'having', 'value': param, 'sub-attribute': attrs[1]}
+        else:
+          q = {'attribute': param, 'operation': 'having', 'value': param}
     status = 1
   except Exception as e:
     app.logger.error("Error: parse_q_single")
@@ -208,7 +310,6 @@ def get_q_params(data, app):
     else:
       params = data['q'].replace(' ', '').split(';')
     q = []
-    app.logger.info(params)
     for param in params:
       if '(' in param or '|' in param:
         dt, status, error = parse_q_multiple(param, app)
@@ -302,15 +403,28 @@ def expand_entities_params(data, context, app):
           data['type_data'][count] = expanded[0]['@type'][0]
     if data['q']:
       for count in range(0, len(data['q'])):
-        if (not validators.url(data['q'][count]['attribute'])):
-          com = {"@context": context_list, data['q'][count]['attribute']: data['q'][count]['attribute']} 
-          expanded = jsonld.expand(com)
-          data['q'][count]['attribute'] = list(expanded[0].keys())[0]
-          if 'sub-attribute' in data['q'][count]:
-            com = {"@context": context_list, data['q'][count]['sub-attribute']: data['q'][count]['sub-attribute']} 
+        if type(data['q'][count]) is dict: 
+          if (not validators.url(data['q'][count]['attribute'])):
+            com = {"@context": context_list, data['q'][count]['attribute']: data['q'][count]['attribute']} 
             expanded = jsonld.expand(com)
-            data['q'][count]['sub-attribute'] = list(expanded[0].keys())[0]
+            data['q'][count]['attribute'] = list(expanded[0].keys())[0]
+            if 'sub-attribute' in data['q'][count]:
+              com = {"@context": context_list, data['q'][count]['sub-attribute']: data['q'][count]['sub-attribute']} 
+              expanded = jsonld.expand(com)
+              data['q'][count]['sub-attribute'] = list(expanded[0].keys())[0]
+        elif type(data['q'][count]) is list:
+          for ct in range(0, len(data['q'][count])):
+            if type(data['q'][count][ct]) is dict: 
+              if (not validators.url(data['q'][count][ct]['attribute'])):
+                com = {"@context": context_list, data['q'][count][ct]['attribute']: data['q'][count][ct]['attribute']} 
+                expanded = jsonld.expand(com)
+                data['q'][count][ct]['attribute'] = list(expanded[0].keys())[0]
+                if 'sub-attribute' in data['q'][count][ct]:
+                  com = {"@context": context_list, data['q'][count][ct]['sub-attribute']: data['q'][count][ct]['sub-attribute']} 
+                  expanded = jsonld.expand(com)
+                  data['q'][count][ct]['sub-attribute'] = list(expanded[0].keys())[0]
     status = 1
+    app.logger.info(data['q'])
   except Exception as e:
     app.logger.error("Error: expand_entities_params")
     app.logger.error(traceback.format_exc())
