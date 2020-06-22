@@ -7,44 +7,155 @@ import datetime
 import validators
 from pyld import jsonld
 
-def build_sql_query_for_q_for_dict_for_having(statement, params, q_params, count, q_type):
+def build_sql_query_for_q_with_sub_attribute(statement, params, q_params, count, q_type):
   """Build sql query for q param"""
-  if 'sub-attribute' in q_params:
-    attr_value = 'attr_value_' + q_type + str(count)
-    sub_value = 'sub_value_'  + q_type + str(count)
-    st = sub_attributes_having_statement.replace('sub_value', sub_value).replace('attr_value', attr_value)
-    statement += ' AND ' + st
-    params[attr_value] = q_params['attribute']
-    params[sub_value] = q_params['sub-attribute']
+  attr_value = 'attr_value_' + q_type + str(count)
+  sub_value = 'sub_value_' + q_type + str(count)
+  operation = 'operation_' + q_type + str(count)
+  if q_params['operation'] in ['like', 'not like']:
+    q_params['value'] = '%{}%'.format(q_params['value'])
+  if q_params['value'] in ['True', 'true', 'TRUE']:
+    st = sub_attributes_true_statement.replace('operation', q_params['operation'])
+  elif q_params['value'] in ['False', 'false', 'FALSE']:
+    st = sub_attributes_false_statement.replace('operation', q_params['operation'])
+  elif 'column' in q_params:
+    col_value = 'col_value_' + q_type + str(count)
+    opr_value = 'opr_value_' + q_type + str(count)
+    st = sub_attributes_object_statement.replace('col_value',col_value).replace('opr_value',opr_value).replace('operation', q_params['operation'])
+    params[col_value] = '%{}%'.format(q_params['column'])
+    params[opr_value] = '%{}%'.format(q_params['value'])
   else:
-    attr_value = 'attr_value_' + q_type + str(count)
-    st = attributes_having_statement.replace('attr_value', attr_value)
+    datetime_flag = 0
+    number_flag = 0
+    datetime_val = ''
+    opr_value = 'opr_value_' + q_type + str(count)
+    try:
+      datetime_val = datetime.datetime.strptime(q_params['value'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
+      datetime_flag = 1
+    except:
+      pass
+    try:
+      int(q_params['value'])
+      number_flag = 1
+    except:
+      pass
+    if datetime_val and datetime_flag:
+      st = sub_attributes_datetime_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = datetime_val
+    elif number_flag:
+      st = sub_attributes_number_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = q_params['value']
+    else:
+      st = sub_attributes_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = q_params['value']
+  st = st.replace('attr_value', attr_value).replace('sub_value', sub_value)
+  params[attr_value] = q_params['attribute']
+  params[sub_value] = q_params['sub-attribute']
+  if count == 0:
     statement += ' AND ' + st
-    params[attr_value] = q_params['attribute']
+  else:
+    statement += ' OR ' + st   
+  return statement, params
+
+def build_sql_query_for_q_with_attribute(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  attr_value = 'attr_value_' + q_type + str(count)
+  operation = 'operation_' + q_type + str(count)
+  if q_params['operation'] in ['like', 'not like']:
+    q_params['value'] = '%{}%'.format(q_params['value'])
+  if q_params['value'] in ['True', 'true', 'TRUE']:
+    st = attributes_true_statement.replace('operation', q_params['operation'])
+  elif q_params['value'] in ['False', 'false', 'FALSE']:
+    st = attributes_false_statement.replace('operation', q_params['operation'])
+  elif 'column' in q_params:
+    col_value = 'col_value_' + q_type + str(count)
+    opr_value = 'opr_value_' + q_type + str(count)
+    st = attributes_object_statement.replace('col_value',col_value).replace('opr_value',opr_value).replace('operation', q_params['operation'])
+    params[col_value] = '%{}%'.format(q_params['column'])
+    params[opr_value] = '%{}%'.format(q_params['value'])
+  else:
+    datetime_flag = 0
+    number_flag = 0
+    datetime_val = ''
+    opr_value = 'opr_value_' + q_type + str(count)
+    try:
+      datetime_val = datetime.datetime.strptime(q_params['value'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
+      datetime_flag = 1
+    except:
+      pass
+    try:
+      int(q_params['value'])
+      number_flag = 1
+    except:
+      pass
+    if datetime_val and datetime_flag:
+      st = attributes_datetime_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = datetime_val
+    elif number_flag:
+      st = attributes_number_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = q_params['value']
+    else:
+      st = attributes_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = q_params['value']
+  st = st.replace('attr_value', attr_value)
+  params[attr_value] = q_params['attribute']
+  if count == 0:
+    statement += ' AND ' + st
+  else:
+    statement += ' OR ' + st   
+  return statement, params
+
+
+def build_sql_query_for_q_for_dict_for_others(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  if q_params['operation'] == '==':
+    q_params['operation'] = '='
+  elif q_params['operation'] == '~=':
+    q_params['operation'] = 'like'
+  elif q_params['operation'] == '!~=':
+    q_params['operation'] = 'not like'
+  if 'sub-attribute' in q_params:
+    statement, params = build_sql_query_for_q_with_sub_attribute(statement, params, q_params, count, q_type)
+  else:
+    statement, params = build_sql_query_for_q_with_attribute(statement, params, q_params, count, q_type)
   return statement, params
 
 def build_sql_query_for_q_for_dict_for_range(statement, params, q_params, count, q_type):
   """Build sql query for q param"""
+  attr_value = 'attr_value_' + q_type + str(count)
+  low_range_value = 'low_range_value_' + q_type + str(count)
+  high_range_value = 'high_range_value' + q_type + str(count)
+  params[low_range_value] = q_params['value'][0]
+  params[high_range_value] = q_params['value'][1]
+  params[attr_value] = q_params['attribute']
   if 'sub-attribute' in q_params:
-    attr_value = 'attr_value_' + q_type + str(count)
-    sub_value = 'sub_value_'  + q_type + str(count)
-    low_range_value = 'low_range_value_' + q_type + str(count)
-    high_range_value = 'high_range_value' + q_type + str(count)
-    st = sub_attributes_range_statement.replace('sub_value', sub_value).replace('attr_value', attr_value).replace('low_range_value', low_range_value).replace('high_range_value',high_range_value)
-    statement += ' AND ' + st
-    params[attr_value] = q_params['attribute']
+    sub_value = 'sub_value_' + q_type + str(count)
+    st = sub_attributes_range_statement.replace('low_range_value', low_range_value).replace('high_range_value',high_range_value).replace('sub_value', sub_value)
     params[sub_value] = q_params['sub-attribute']
-    params[low_range_value] = q_params['value'][0]
-    params[high_range_value] = q_params['value'][1]
   else:
-    attr_value = 'attr_value_' + q_type + str(count)
-    low_range_value = 'low_range_value_' + q_type + str(count)
-    high_range_value = 'high_range_value' + q_type + str(count)
-    st = attributes_range_statement.replace('attr_value', attr_value).replace('low_range_value', low_range_value).replace('high_range_value',high_range_value)
+    st = attributes_range_statement.replace('low_range_value', low_range_value).replace('high_range_value',high_range_value)
+  st = st.replace('attr_value', attr_value)
+  if count == 0:
     statement += ' AND ' + st
-    params[attr_value] = q_params['attribute']
-    params[low_range_value] = q_params['value'][0]
-    params[high_range_value] = q_params['value'][1]
+  else:
+    statement += ' OR ' + st   
+  return statement, params
+
+def build_sql_query_for_q_for_dict_for_having(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  attr_value = 'attr_value_' + q_type + str(count)
+  params[attr_value] = q_params['attribute']
+  if 'sub-attribute' in q_params:
+    sub_value = 'sub_value_' + q_type + str(count)
+    st = sub_attributes_having_statement.replace('sub_value', sub_value)
+    params[sub_value] = q_params['sub-attribute']
+  else:
+    st = attributes_having_statement
+  st = st.replace('attr_value', attr_value)
+  if count == 0:
+    statement += ' AND ' + st
+  else:
+    statement += ' OR ' + st      
   return statement, params
 
 def build_sql_query_for_q_for_dict(statement, params, q_params, count, q_type, app):
@@ -56,28 +167,205 @@ def build_sql_query_for_q_for_dict(statement, params, q_params, count, q_type, a
       statement, params = build_sql_query_for_q_for_dict_for_having(statement, params, q_params, count, q_type)
     elif q_params['operation'] == 'range':
       statement, params = build_sql_query_for_q_for_dict_for_range(statement, params, q_params, count, q_type)
+    else:
+      statement, params = build_sql_query_for_q_for_dict_for_others(statement, params, q_params, count, q_type)
     status = 1
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_q_for_dict")
     app.logger.error(traceback.format_exc())
   return statement, params, status, error
 
-def build_sql_query_for_q(statement, params, q_params, app):
+def build_sql_query_for_q_list_with_sub_attribute(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  attr_value = 'attr_value_' + q_type + str(count)
+  sub_value = 'sub_value_' + q_type + str(count)
+  operation = 'operation_' + q_type + str(count)
+  if q_params['operation'] in ['like', 'not like']:
+    q_params['value'] = '%{}%'.format(q_params['value'])
+  if q_params['value'] in ['True', 'true', 'TRUE']:
+    st = sub_attributes_true_statement.replace('operation', q_params['operation'])
+  elif q_params['value'] in ['False', 'false', 'FALSE']:
+    st = sub_attributes_false_statement.replace('operation', q_params['operation'])
+  elif 'column' in q_params:
+    col_value = 'col_value_' + q_type + str(count)
+    opr_value = 'opr_value_' + q_type + str(count)
+    st = sub_attributes_object_statement.replace('col_value',col_value).replace('opr_value',opr_value).replace('operation', q_params['operation'])
+    params[col_value] = '%{}%'.format(q_params['column'])
+    params[opr_value] = '%{}%'.format(q_params['value'])
+  else:
+    datetime_flag = 0
+    number_flag = 0
+    datetime_val = ''
+    opr_value = 'opr_value_' + q_type + str(count)
+    try:
+      datetime_val = datetime.datetime.strptime(q_params['value'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
+      datetime_flag = 1
+    except:
+      pass
+    try:
+      int(q_params['value'])
+      number_flag = 1
+    except:
+      pass
+    if datetime_val and datetime_flag:
+      st = sub_attributes_datetime_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = datetime_val
+    elif number_flag:
+      st = sub_attributes_number_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = q_params['value']
+    else:
+      st = sub_attributes_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = q_params['value']
+  st = st.replace('attr_value', attr_value).replace('sub_value', sub_value)
+  params[attr_value] = q_params['attribute']
+  params[sub_value] = q_params['sub-attribute']
+  statement += ' ' + st   
+  return statement, params
+
+def build_sql_query_for_q_list_with_attribute(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  attr_value = 'attr_value_' + q_type + str(count)
+  operation = 'operation_' + q_type + str(count)
+  if q_params['operation'] in ['like', 'not like']:
+    q_params['value'] = '%{}%'.format(q_params['value'])
+  if q_params['value'] in ['True', 'true', 'TRUE']:
+    st = attributes_true_statement.replace('operation', q_params['operation'])
+  elif q_params['value'] in ['False', 'false', 'FALSE']:
+    st = attributes_false_statement.replace('operation', q_params['operation'])
+  elif 'column' in q_params:
+    col_value = 'col_value_' + q_type + str(count)
+    opr_value = 'opr_value_' + q_type + str(count)
+    st = attributes_object_statement.replace('col_value',col_value).replace('opr_value',opr_value).replace('operation', q_params['operation'])
+    params[col_value] = '%{}%'.format(q_params['column'])
+    params[opr_value] = '%{}%'.format(q_params['value'])
+  else:
+    datetime_flag = 0
+    number_flag = 0
+    datetime_val = ''
+    opr_value = 'opr_value_' + q_type + str(count)
+    try:
+      datetime_val = datetime.datetime.strptime(q_params['value'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
+      datetime_flag = 1
+    except:
+      pass
+    try:
+      int(q_params['value'])
+      number_flag = 1
+    except:
+      pass
+    if datetime_val and datetime_flag:
+      st = attributes_datetime_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = datetime_val
+    elif number_flag:
+      st = attributes_number_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = q_params['value']
+    else:
+      st = attributes_statement.replace('opr_value',opr_value).replace('operation', q_params['operation'])
+      params[opr_value] = q_params['value']
+  st = st.replace('attr_value', attr_value)
+  params[attr_value] = q_params['attribute']
+  statement += ' ' + st   
+  return statement, params
+
+
+def build_sql_query_for_q_for_list_for_others(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  if q_params['operation'] == '==':
+    q_params['operation'] = '='
+  elif q_params['operation'] == '~=':
+    q_params['operation'] = 'like'
+  elif q_params['operation'] == '!~=':
+    q_params['operation'] = 'not like'
+  if 'sub-attribute' in q_params:
+    statement, params = build_sql_query_for_q_list_with_sub_attribute(statement, params, q_params, count, q_type)
+  else:
+    statement, params = build_sql_query_for_q_list_with_attribute(statement, params, q_params, count, q_type)
+  return statement, params
+
+def build_sql_query_for_q_for_list_for_range(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  attr_value = 'attr_value_' + q_type + str(count)
+  low_range_value = 'low_range_value_' + q_type + str(count)
+  high_range_value = 'high_range_value' + q_type + str(count)
+  params[low_range_value] = q_params['value'][0]
+  params[high_range_value] = q_params['value'][1]
+  params[attr_value] = q_params['attribute']
+  if 'sub-attribute' in q_params:
+    sub_value = 'sub_value_' + q_type + str(count)
+    st = sub_attributes_range_statement.replace('low_range_value', low_range_value).replace('high_range_value',high_range_value).replace('sub_value', sub_value)
+    params[sub_value] = q_params['sub-attribute']
+  else:
+    st = attributes_range_statement.replace('low_range_value', low_range_value).replace('high_range_value',high_range_value)
+  st = st.replace('attr_value', attr_value)
+  statement += ' ' + st   
+  return statement, params
+
+def build_sql_query_for_q_for_list_for_having(statement, params, q_params, count, q_type):
+  """Build sql query for q param"""
+  attr_value = 'attr_value_' + q_type + str(count)
+  params[attr_value] = q_params['attribute']
+  if 'sub-attribute' in q_params:
+    sub_value = 'sub_value_' + q_type + str(count)
+    st = sub_attributes_having_statement.replace('sub_value', sub_value)
+    params[sub_value] = q_params['sub-attribute']
+  else:
+    st = attributes_having_statement
+  st = st.replace('attr_value', attr_value)
+  statement += ' ' + st      
+  return statement, params
+
+def build_sql_query_for_q_for_list(statement, params, q_params, count, q_type, app):
+  """Build sql query for q param"""
+  status = 0
+  error = 'Error in building sql query for entities for q param.'
+  try:
+    if q_params['operation'] == 'having':
+      statement, params = build_sql_query_for_q_for_list_for_having(statement, params, q_params, count, q_type)
+    elif q_params['operation'] == 'range':
+      statement, params = build_sql_query_for_q_for_list_for_range(statement, params, q_params, count, q_type)
+    else:
+      statement, params = build_sql_query_for_q_for_list_for_others(statement, params, q_params, count, q_type)
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: build_sql_query_for_q_for_list")
+    app.logger.error(traceback.format_exc())
+  return statement, params, status, error
+
+
+def build_sql_query_for_q(statement, params, q_params, attributes, app):
   """Build sql query for q param"""
   status = 0
   q_dict = 'q_dict'
+  q_list = 'q_list'
   error = 'Error in building sql query for entities for q param.'
+  attr_statement = attributes_having_statement
+  sub_statement = sub_attributes_having_statement
+  sub_attribute_flag = 0 
   try:
-    for count in range(0, len(q_params)):
+    q_len = len(q_params)
+    for count in range(0, q_len):
       if type(q_params[count]) is dict:
         statement, params, status, error = build_sql_query_for_q_for_dict(statement, params, q_params[count], count, q_dict, app)
+        attributes.append(q_params[count]['attribute'])
         if not status:
-          return statement, params, status, error
+          return statement, params, attributes, status, error
+      else:
+        statement += ' AND ('
+        for index in range(0, len(q_params[count])):
+          ids = '%s_%s' %(count,index)
+          if type(q_params[count][index]) is dict:
+            statement, params, status, error = build_sql_query_for_q_for_list(statement, params, q_params[count][index], ids, q_list, app)
+            attributes.append(q_params[count][index]['attribute'])
+            if not status:
+              return statement, params, attributes, status, error
+          else:
+            statement += ' ' + q_params[count][index] + ' '
+        statement += ' )'
     status = 1
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_q")
     app.logger.error(traceback.format_exc())
-  return statement, params, status, error
+  return statement, params, attributes, status, error
 
 def build_sql_query_for_entities(data, app):
   """Build sql query"""
@@ -96,15 +384,6 @@ def build_sql_query_for_entities(data, app):
       statement += " WHERE entity_table."+ data['timeproperty']+">=%(time)s AND entity_table."+ data['timeproperty']+"<%(endtime)s"
       params["time"] = data['time']
       params["endtime"] = data['endtime']
-    if data['attrs'] and len(data['attrs']) > 0:
-      statement += ' AND attributes_table.id in ('
-      for index in range(0,len(data['attrs'])):
-        if index == (len(data['attrs']) -1):
-          statement += '%(attrs'+str(index)+')s'
-        else:
-          statement += '%(attrs'+str(index)+')s,'
-        params['attrs'+str(index)] = data['attrs'][index]
-      statement += ')'
     if data['id_data'] and len(data['id_data']) > 0:
       statement += ' AND entity_table.entity_id in ('
       for index in range(0,len(data['id_data'])):
@@ -126,10 +405,62 @@ def build_sql_query_for_entities(data, app):
     if data['idPattern']:
       statement += " AND entity_table.entity_id like %(idPattern)s"
       params["idPattern"] = '%{}%'.format(data['idPattern'])
+    attributes = []
     if data['q']:
-      statement, params, status, error = build_sql_query_for_q(statement, params, data['q'], app)
+      statement, params, attributes, status, error = build_sql_query_for_q(statement, params, data['q'], attributes, app)
       if not status:
         return statement, params, status, error
+    run_attr = 1
+    if len(attributes) > 0:
+      attr_flag = 0
+      run_attr = 0
+      run_not_attr = 1
+      if data['attrs'] and len(data['attrs']) > 0:
+        run_not_attr = 0
+        for attr in data['attrs']:
+          if attr not in attributes:
+            attr_flag = 1
+            break
+      app.logger.info(attributes)
+      app.logger.info(attr_flag)
+      app.logger.info(data['attrs'])
+      if attr_flag:
+        app.logger.info(11)
+        statement += ' OR (attributes_table.id in ('
+        for index in range(0,len(data['attrs'])):
+          if index == (len(data['attrs']) -1):
+            statement += '%(attrs'+str(index)+')s'
+          else:
+            statement += '%(attrs'+str(index)+')s,'
+          params['attrs'+str(index)] = data['attrs'][index]
+        statement += ') AND '
+        statement += 'attributes_table.id not in ('
+        for index in range(0,len(attributes)):
+          if index == (len(attributes) -1):
+            statement += '%(attributes'+str(index)+')s'
+          else:
+            statement += '%(attributes'+str(index)+')s,'
+          params['attributes'+str(index)] = attributes[index]
+        statement += '))'
+      elif run_not_attr:
+        app.logger.info(2)
+        statement += ' OR (attributes_table.id not in ('
+        for index in range(0,len(attributes)):
+          if index == (len(attributes) -1):
+            statement += '%(attributes'+str(index)+')s'
+          else:
+            statement += '%(attributes'+str(index)+')s,'
+          params['attributes'+str(index)] = attributes[index]
+        statement += '))'
+    if run_attr and data['attrs'] and len(data['attrs']) > 0:
+      statement += ' AND attributes_table.id in ('
+      for index in range(0,len(data['attrs'])):
+        if index == (len(data['attrs']) -1):
+          statement += '%(attrs'+str(index)+')s'
+        else:
+          statement += '%(attrs'+str(index)+')s,'
+        params['attrs'+str(index)] = data['attrs'][index]
+      statement += ')'
     statement +=" order by entity_table."+ data['timeproperty']+" desc"
     if data['lastN']:
       statement += " limit %(lastN)s"
@@ -232,12 +563,9 @@ def parse_q_multiple(param, app):
         start, end, status, error = get_q_params_in_list(start, count, param, q, app)
         start = count
         q.append(param[count])
-      elif param[count] == '|':
+      elif param[count] in ['|',';']:
         start, end, status, error = get_q_params_in_list(start, count, param, q, app)
         q.append('OR')
-      elif param[count] == ';':
-        start, end, status, error = get_q_params_in_list(start, count, param, q, app)
-        q.append('AND')
       elif count == (q_len -1):
         end = count + 1
         if end != 0:
@@ -269,12 +597,20 @@ def parse_q_single(param, app):
         param = param.split(op)
         if '.' in param[0]:
           attrs = param[0].split('.')
-          q = {'attribute': attrs[0], 'operation': op, 'value': param[1], 'sub-attribute': attrs[1]}
+          if '..' in param[1]:
+            param[1] = param[1].split('..')
+            q = {'attribute': attrs[0], 'operation': 'range', 'value': param[1], 'sub-attribute': attrs[1]}
+          else:
+            q = {'attribute': attrs[0], 'operation': op, 'value': param[1], 'sub-attribute': attrs[1]}
         elif '[' in param[0] and ']' in param[0]:
           attrs = param[0].replace(']', '').split('[')
           q = {'attribute': attrs[0], 'operation': op, 'value': param[1], 'column': attrs[1]}
         else:
-          q = {'attribute': param[0], 'operation': op, 'value': param[1]}
+          if '..' in param[1]:
+            param[1] = param[1].split('..')
+            q = {'attribute': param[0], 'operation': 'range', 'value': param[1]}
+          else:
+            q = {'attribute': param[0], 'operation': op, 'value': param[1]}
         break
     if flag == 0:
       if '..' in param:
