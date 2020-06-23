@@ -47,7 +47,7 @@ def get_temporal_entities():
     record = cursor.fetchall()
     app.logger.info(len(record))
     if len(record):
-      response_data , status, error= build_response_data_for_entity(record, context, data, app)
+      response_data , status, error= build_response_data_for_entities(record, context, data, app)
       if not status:
         return Response(error, status=400, )
     else:
@@ -110,11 +110,6 @@ def get_temporal_entity(entity_id):
     app.logger.error("Error: get_temporal_entity")
     app.logger.error(traceback.format_exc())
     abort(400)
-
-
-
-
-
 
 load_context(default_context, app)
 

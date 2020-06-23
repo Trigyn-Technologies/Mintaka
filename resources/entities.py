@@ -3,9 +3,213 @@ import traceback
 from resources.postgres import start_statement
 from resources.context import default_context
 from resources.postgres import *
+from resources.records import *
 import datetime
 import validators
 from pyld import jsonld
+
+
+def build_response_data_for_entities(record, context, data, app):
+  """Build response for entities api"""
+  response_data = []
+  response_dict = {}
+  status = 0
+  error = 'Error in building response data for entities'
+  try:
+    if 'options' in data and data['options'] == 'temporalValues':
+      response_data, status, error = build_temporal_response_data_for_entities(record, response_dict, context, data, app)
+      app.logger.info(1234)
+    else:
+      response_data, status, error = build_normal_response_data_for_entities(record, response_dict, context, data, app)
+  except Exception as e:
+    app.logger.error("Error: build_response_data_for_entities")
+    app.logger.error(traceback.format_exc())
+  return response_data, status, error
+
+def build_normal_response_data_for_entities(record_list, response_dict, context, data, app):
+  """Build response if options = None"""
+  get_attr_val_dict = {'value_string': get_normal_value_string,  'value_boolean': get_normal_value_boolean, 'value_number':get_normal_value_number, 'value_relation': get_normal_value_relation, 'value_object':get_normal_value_object,'value_datetime':get_normal_value_datetime}
+  compacted_dict = {}
+  response_data = []
+  status = 0
+  error = 'Error in building normal response data for entities.'
+  attrs_list = []
+  attrs_index = []
+  entity_val = {'id': 0, 'type':1, 'location':2 ,'createdAt':3, 'modifiedAt':4, 'observedAt':5}
+  attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'instance_id':12, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32 }
+  subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
+  try:
+    for record in record_list:
+      if record[entity_val['id']] not in response_dict.keys():
+        response_dict[record[entity_val['id']]] = {}
+        response_dict[record[entity_val['id']]]['id'] = record[entity_val['id']]
+        response_dict[record[entity_val['id']]]['type'] = compact_entities_params(record[entity_val['type']], context, {} ,app)
+        if 'options' in data and data['options'] == 'sysAttrs':
+          if record[entity_val['createdAt']]:
+            response_dict[record[entity_val['id']]]['createdAt'] = record[entity_val['createdAt']].replace(' ','')
+          if record[entity_val['modifiedAt']]:
+            response_dict[record[entity_val['id']]]['modifiedAt'] = record[entity_val['modifiedAt']].replace(' ','')
+          if record[entity_val['observedAt']]:
+            response_dict[record[entity_val['id']]]['observedAt'] = record[entity_val['observedAt']].replace(' ','')
+        else:
+          if record[entity_val['observedAt']]:
+            response_dict[record[entity_val['id']]]['observedAt'] = record[entity_val['observedAt']].replace(' ','')
+        if record[entity_val['location']]:
+          response_dict[record[entity_val['id']]]['location'] = {"type": "GeoProperty", 'value': json.loads(record[entity_val['location']])}
+        if context:
+          response_dict[record[entity_val['id']]]['@context'] = [context, default_context]
+        else:
+          response_dict[record[entity_val['id']]]['@context'] = default_context
+
+      if (not data['attrs']) or (data['attrs'] and record[attr_val['id']] in data['attrs']):
+        attr = compact_entities_params(record[attr_val['id']], context, compacted_dict, app)
+        if attr not in response_dict[record[entity_val['id']]].keys():
+          response_dict[record[entity_val['id']]][attr] = []
+        attr_dict = {}
+        if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+          attr_dict = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_dict)
+        if record[attr_val['unit_code']]:
+          attr_dict['unitCode'] = record[attr_val['unit_code']]
+        if record[attr_val['location']]:
+          attr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[attr_val['location']])}
+        if record[attr_val['createdAt']]:
+          attr_dict['createdAt'] = record[attr_val['createdAt']].replace(' ', '')
+        if record[attr_val['modifiedAt']]:
+          attr_dict['modifiedAt'] = record[attr_val['modifiedAt']].replace(' ', '')
+        if record[attr_val['observedAt']]:
+          attr_dict['observedAt'] = record[attr_val['observedAt']].replace(' ', '')
+        if record[attr_val['instance_id']] not in attrs_list:
+          attrs_list.append(record[attr_val['instance_id']])
+          response_dict[record[entity_val['id']]][attr].append(attr_dict)
+          attrs_index.append(len(response_dict[record[entity_val['id']]][attr]) -1)
+        if record[attr_val['sub_property']] and record[subattr_val['id']]:
+          subattr = compact_entities_params(record[subattr_val['id']], context, compacted_dict, app)
+          subattr_dict = {}
+          if record[subattr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+            subattr_dict = get_attr_val_dict[record[subattr_val['value_type']]](record, subattr_val, subattr_dict)
+          if record[subattr_val['unit_code']]:
+            subattr_dict['unitCode'] = record[subattr_val['unit_code']]
+          if record[subattr_val['location']]:
+            subattr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[subattr_val['location']])}
+          index = attrs_list.index(record[attr_val['instance_id']])
+          response_dict[record[entity_val['id']]][attr][attrs_index[index]][subattr] = subattr_dict
+    status = 1
+    response_data = list(response_dict.values())
+  except Exception as e:
+    app.logger.error("Error: build_normal_response_data_for_entities")
+    app.logger.error(traceback.format_exc())
+  return response_data, status, error
+
+def build_temporal_response_data_for_entities(record_list, response_dict, context, data, app):
+  """Building response if options = Temporalvalues"""
+  get_attr_val_dict = {'value_string': get_temporal_value_string,  'value_boolean': get_temporal_value_boolean, 'value_number':get_temporal_value_number, 'value_relation': get_temporal_value_relation, 'value_object':get_temporal_value_object,'value_datetime':get_temporal_value_datetime}
+  compacted_dict = {}
+  response_data = []
+  status = 0
+  entity_val = {'id': 0, 'type':1, 'location':2 ,'createdAt':3, 'modifiedAt':4, 'observedAt':5}
+  error = 'Error in building temporal response data for entities'
+  attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32}
+  subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
+  try:
+    for record in record_list:
+      if record[entity_val['id']] not in response_dict.keys():
+        response_dict[record[entity_val['id']]] = {}
+        response_dict[record[entity_val['id']]]['id'] = record[entity_val['id']]
+        response_dict[record[entity_val['id']]]['type'] = compact_entities_params(record[entity_val['type']], context, {} ,app)
+        if 'options' in data and data['options'] == 'sysAttrs':
+          if record[entity_val['createdAt']]:
+            response_dict[record[entity_val['id']]]['createdAt'] = record[entity_val['createdAt']].replace(' ','')
+          if record[entity_val['modifiedAt']]:
+            response_dict[record[entity_val['id']]]['modifiedAt'] = record[entity_val['modifiedAt']].replace(' ','')
+          if record[entity_val['observedAt']]:
+            response_dict[record[entity_val['id']]]['observedAt'] = record[entity_val['observedAt']].replace(' ','')
+        else:
+          if record[entity_val['observedAt']]:
+            response_dict[record[entity_val['id']]]['observedAt'] = record[entity_val['observedAt']].replace(' ','')
+        if record[entity_val['location']]:
+          response_dict[record[entity_val['id']]]['location'] = {"type": "GeoProperty", 'value': json.loads(record[entity_val['location']])}
+        if context:
+          response_dict[record[entity_val['id']]]['@context'] = [context, default_context]
+        else:
+          response_dict[record[entity_val['id']]]['@context'] = default_context
+
+      if (not data['attrs']) or (data['attrs'] and record[attr_val['id']] in data['attrs']):
+        attr = compact_entities_params(record[attr_val['id']], context, compacted_dict, app)
+        if attr not in response_dict[record[entity_val['id']]].keys():
+          response_dict[record[entity_val['id']]][attr] = {'type': '', 'value': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'value': []}}
+        attr_list = []
+        if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+          attr_list = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_list, response_dict[record[entity_val['id']]], attr) 
+        if data['timeproperty'] == 'created_at':
+          if record[attr_val['createdAt']]:
+            attr_list.append(record[attr_val['createdAt']].replace(' ', ''))
+          else:
+            attr_list.append('')
+        elif data['timeproperty'] == 'observed_at':
+          if record[attr_val['observedAt']]:
+            attr_list.append(record[attr_val['observedAt']].replace(' ', ''))
+          else:
+            attr_list.append('')
+        else:
+          if record[attr_val['modifiedAt']]:
+            attr_list.append(record[attr_val['modifiedAt']].replace(' ', ''))
+          else:
+            attr_list.append('')
+        if attr_list not in response_dict[record[entity_val['id']]][attr]['value']:
+          response_dict[record[entity_val['id']]][attr]['value'].append(attr_list)
+          if record[attr_val['unit_code']]:
+            response_dict[record[entity_val['id']]][attr]['unitCode'].append(record[attr_val['unit_code']])
+          else:
+            response_dict[record[entity_val['id']]][attr]['unitCode'].append('')
+          if record[attr_val['location']]:
+            response_dict[record[entity_val['id']]][attr]['location']['value'].append(json.loads(record[attr_val['location']]))
+          else:
+            response_dict[record[entity_val['id']]][attr]['location']['value'].append('')
+        if record[attr_val['sub_property']] and record[subattr_val['id']]:
+          subattr = compact_entities_params(record[subattr_val['id']], context, compacted_dict, app)
+          if subattr not in response_dict[record[entity_val['id']]][attr].keys():
+            response_dict[record[entity_val['id']]][attr][subattr] = {'type': '', 'value': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'value': []}}
+          if record[subattr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+            subattr_list = get_attr_val_dict[record[subattr_val['value_type']]](record, subattr_val, response_dict[record[entity_val['id']]][attr][subattr]['value'], response_dict[record[entity_val['id']]][attr], subattr)
+          if record[subattr_val['unit_code']]:
+            response_dict[record[entity_val['id']]][attr][subattr]['unitCode'].append(record[subattr_val['unit_code']])
+          if record[subattr_val['location']]:
+            response_dict[record[entity_val['id']]][attr][subattr]['location']['value'].append({"type": "GeoProperty", 'value': json.loads(record[subattr_val['location']])})
+    status = 1
+    response_data = list(response_dict.values())
+  except Exception as e:
+    app.logger.error("Error: build_temporal_response_data_for_entities")
+    app.logger.error(traceback.format_exc())
+  return response_data, status, error
+
+def compact_entities_params(attr, context, compacted_dict, app):
+  """Apply compaction output"""
+  context_list = []
+  attr_key = attr
+  default_context_compact = 'https://uri.etsi.org/ngsi-ld/default-context/'
+  try:
+    if attr in compacted_dict:
+      return compacted_dict[attr]
+    if default_context_compact in attr:
+      attr = attr.replace(default_context_compact, '')
+      compacted_dict[attr_key] = attr
+      return attr
+    if context:
+      if context in app.context_dict.keys():
+        context_list.append(app.context_dict[context])
+      else:
+        context_list.append(context)
+    context_list.append(app.context_dict[default_context])
+    con = {"@context": context_list}
+    com =  {attr: attr}
+    compacted = jsonld.compact(com, con)
+    attr = list(compacted.keys())[1]
+    compacted_dict[attr_key] = attr
+  except Exception as e:
+    app.logger.error("Error: compact_entities_params")
+    app.logger.error(traceback.format_exc())
+  return attr
+
 
 def build_sql_query_for_q_with_sub_attribute(statement, params, q_params, count, q_type):
   """Build sql query for q param"""
@@ -519,6 +723,8 @@ def get_temporal_entities_parameters(args, context, app):
       types = args.get('type')
       if types:
         data['type_data'] = types.split(',')
+    if 'options' in args and args.get('options'):
+      data['options'] = args.get('options')
     data, status, error = expand_entities_params(data, context, app)
   except Exception as e:
     app.logger.error("Error: get_temporal_entities_parameters")
