@@ -350,7 +350,10 @@ def build_sql_query_for_q(statement, params, q_params, attributes, app):
         if not status:
           return statement, params, attributes, status, error
       else:
-        statement += ' AND ('
+        if count == 0:
+          statement += ' AND ('
+        else:
+          statement += ' OR ('
         for index in range(0, len(q_params[count])):
           ids = '%s_%s' %(count,index)
           if type(q_params[count][index]) is dict:
@@ -421,11 +424,7 @@ def build_sql_query_for_entities(data, app):
           if attr not in attributes:
             attr_flag = 1
             break
-      app.logger.info(attributes)
-      app.logger.info(attr_flag)
-      app.logger.info(data['attrs'])
       if attr_flag:
-        app.logger.info(11)
         statement += ' OR (attributes_table.id in ('
         for index in range(0,len(data['attrs'])):
           if index == (len(data['attrs']) -1):
@@ -443,7 +442,6 @@ def build_sql_query_for_entities(data, app):
           params['attributes'+str(index)] = attributes[index]
         statement += '))'
       elif run_not_attr:
-        app.logger.info(2)
         statement += ' OR (attributes_table.id not in ('
         for index in range(0,len(attributes)):
           if index == (len(attributes) -1):
@@ -659,7 +657,6 @@ def get_q_params(data, app):
         q.append(dt)
     data['q'] = q
     status = 1
-    app.logger.info(data['q'])
   except Exception as e:
     app.logger.error("Error: get_q_params")
     app.logger.error(traceback.format_exc())
@@ -760,7 +757,6 @@ def expand_entities_params(data, context, app):
                   expanded = jsonld.expand(com)
                   data['q'][count][ct]['sub-attribute'] = list(expanded[0].keys())[0]
     status = 1
-    app.logger.info(data['q'])
   except Exception as e:
     app.logger.error("Error: expand_entities_params")
     app.logger.error(traceback.format_exc())
