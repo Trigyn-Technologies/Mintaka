@@ -40,7 +40,8 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
   subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
   try:
     for record in record_list:
-      if record[entity_val['id']] not in response_dict.keys():
+      response_keys = response_dict.keys()
+      if record[entity_val['id']] not in response_keys:
         response_dict[record[entity_val['id']]] = {}
         response_dict[record[entity_val['id']]]['id'] = record[entity_val['id']]
         response_dict[record[entity_val['id']]]['type'] = compact_entities_params(record[entity_val['type']], context, {} ,app)
@@ -60,11 +61,14 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
           response_dict[record[entity_val['id']]]['@context'] = [context, default_context]
         else:
           response_dict[record[entity_val['id']]]['@context'] = default_context
-
+      elif 'lastN' in data and data['lastN'] and len(response_keys) >= data['lastN']:
+        continue
       if (not data['attrs']) or (data['attrs'] and record[attr_val['id']] in data['attrs']):
         attr = compact_entities_params(record[attr_val['id']], context, compacted_dict, app)
         if attr not in response_dict[record[entity_val['id']]].keys():
           response_dict[record[entity_val['id']]][attr] = []
+        elif 'lastN' in data and data['lastN'] and len(response_dict[record[entity_val['id']]][attr]) >= data['lastN']:
+          continue
         attr_dict = {}
         if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
           attr_dict = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_dict)
@@ -72,10 +76,11 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
           attr_dict['unitCode'] = record[attr_val['unit_code']]
         if record[attr_val['location']]:
           attr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[attr_val['location']])}
-        if record[attr_val['createdAt']]:
-          attr_dict['createdAt'] = record[attr_val['createdAt']].replace(' ', '')
-        if record[attr_val['modifiedAt']]:
-          attr_dict['modifiedAt'] = record[attr_val['modifiedAt']].replace(' ', '')
+        if 'options' in data and data['options'] == 'sysAttrs':
+          if record[attr_val['createdAt']]:
+            attr_dict['createdAt'] = record[attr_val['createdAt']].replace(' ', '')
+          if record[attr_val['modifiedAt']]:
+            attr_dict['modifiedAt'] = record[attr_val['modifiedAt']].replace(' ', '')
         if record[attr_val['observedAt']]:
           attr_dict['observedAt'] = record[attr_val['observedAt']].replace(' ', '')
         if record[attr_val['instance_id']] not in attrs_list:
@@ -112,7 +117,8 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
   subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
   try:
     for record in record_list:
-      if record[entity_val['id']] not in response_dict.keys():
+      response_keys = response_dict.keys()
+      if record[entity_val['id']] not in response_keys:
         response_dict[record[entity_val['id']]] = {}
         response_dict[record[entity_val['id']]]['id'] = record[entity_val['id']]
         response_dict[record[entity_val['id']]]['type'] = compact_entities_params(record[entity_val['type']], context, {} ,app)
@@ -132,11 +138,14 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
           response_dict[record[entity_val['id']]]['@context'] = [context, default_context]
         else:
           response_dict[record[entity_val['id']]]['@context'] = default_context
-
+      elif 'lastN' in data and data['lastN'] and len(response_keys) >= data['lastN']:
+        continue
       if (not data['attrs']) or (data['attrs'] and record[attr_val['id']] in data['attrs']):
         attr = compact_entities_params(record[attr_val['id']], context, compacted_dict, app)
         if attr not in response_dict[record[entity_val['id']]].keys():
           response_dict[record[entity_val['id']]][attr] = {'type': '', 'value': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'value': []}}
+        elif 'lastN' in data and data['lastN'] and len(response_dict[record[entity_val['id']]][attr]['value']) >= data['lastN']:
+          continue
         attr_list = []
         if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
           attr_list = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_list, response_dict[record[entity_val['id']]], attr) 
@@ -663,10 +672,7 @@ def build_sql_query_for_entities(data, app):
           statement += '%(attrs'+str(index)+')s,'
         params['attrs'+str(index)] = data['attrs'][index]
       statement += ')'
-    statement +=" order by entity_table."+ data['timeproperty']+" desc"
-    if data['lastN']:
-      statement += " limit %(lastN)s"
-      params["lastN"] = data['lastN']  
+    statement +=" order by entity_table."+ data['timeproperty']+" desc" 
     statement += "%s"%(";")
     status = 1
     app.logger.info(statement)
@@ -697,7 +703,10 @@ def get_temporal_entities_parameters(args, context, app):
     if 'attrs' in args and args.get('attrs'):
       data['attrs'] = args.get('attrs').split(',')
     if 'lastN' in args and args.get('lastN'):
-      data['lastN'] = args.get('lastN')
+      try:
+        data['lastN'] = int(args.get('lastN'))
+      except:
+        data['lastN'] = None
     if 'idPattern' in args and args.get('idPattern'):
       data['idPattern'] = args.get('idPattern')
     if 'q' in args and args.get('q'):

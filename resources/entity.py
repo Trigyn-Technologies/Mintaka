@@ -57,6 +57,8 @@ def build_normal_response_data_for_entity(record_list, response_data, context, d
       attr = compact_entity_params(record[attr_val['id']], context, compacted_dict, app)
       if attr not in response_data.keys():
         response_data[attr] = []
+      elif 'lastN' in data and data['lastN'] and len(response_data[attr]) >= data['lastN']:
+        continue
       attr_dict = {}
       if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
         attr_dict = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_dict)
@@ -64,10 +66,11 @@ def build_normal_response_data_for_entity(record_list, response_data, context, d
         attr_dict['unitCode'] = record[attr_val['unit_code']]
       if record[attr_val['location']]:
         attr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[attr_val['location']])}
-      if record[attr_val['createdAt']]:
-        attr_dict['createdAt'] = record[attr_val['createdAt']].replace(' ', '')
-      if record[attr_val['modifiedAt']]:
-        attr_dict['modifiedAt'] = record[attr_val['modifiedAt']].replace(' ', '')
+      if 'options' in data and data['options'] == 'sysAttrs':
+        if record[attr_val['createdAt']]:
+          attr_dict['createdAt'] = record[attr_val['createdAt']].replace(' ', '')
+        if record[attr_val['modifiedAt']]:
+          attr_dict['modifiedAt'] = record[attr_val['modifiedAt']].replace(' ', '')
       if record[attr_val['observedAt']]:
         attr_dict['observedAt'] = record[attr_val['observedAt']].replace(' ', '')
       if record[attr_val['instance_id']] not in attrs_list:
@@ -104,6 +107,8 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
       attr = compact_entity_params(record[attr_val['id']], context, compacted_dict, app)
       if attr not in response_data.keys():
         response_data[attr] = {'type': '', 'value': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'value': []}}
+      elif 'lastN' in data and data['lastN'] and len(response_data[attr]['value']) >= data['lastN']:
+        continue
       attr_list = []
       if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
         attr_list = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_list, response_data, attr) 
@@ -204,10 +209,7 @@ def build_sql_query_for_entity(data, entity_id, app):
         params['attrs'+str(index)] = data['attrs'][index]
       statement += ')'
     statement += " AND attributes_table.entity_id = %(entity_id)s order by attributes_table."+ data['timeproperty']+" desc"
-    params["entity_id"] = entity_id
-    if data['lastN']:
-      statement += " limit %(lastN)s"
-      params["lastN"] = data['lastN'] 
+    params["entity_id"] = entity_id 
     statement += "%s"%(';')
     status = 1
   except Exception as e:
@@ -236,7 +238,10 @@ def get_temporal_entity_parameters(args, context, app):
     if 'attrs' in args and args.get('attrs'):
       data['attrs'] = args.get('attrs').split(',')
     if 'lastN' in args and args.get('lastN'):
-      data['lastN'] = args.get('lastN')
+      try:
+        data['lastN'] = int(args.get('lastN'))
+      except:
+        data['lastN'] = None
     if data['timeproperty'] not in ['modified_at', 'observed_at', 'created_at']:
       data['timeproperty'] = 'modified_at'
     if 'options' in args and args.get('options'):
