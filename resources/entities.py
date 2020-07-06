@@ -6,6 +6,7 @@ from resources.postgres import *
 from resources.records import *
 import datetime
 import validators
+import re
 from pyld import jsonld
 
 
@@ -14,16 +15,16 @@ def build_response_data_for_entities(record, context, data, app):
   response_data = []
   response_dict = {}
   status = 0
-  error = 'Error in building response data for entities'
+  error = ''
   try:
     if 'options' in data and data['options'] == 'temporalValues':
       response_data, status, error = build_temporal_response_data_for_entities(record, response_dict, context, data, app)
-      app.logger.info(1234)
     else:
       response_data, status, error = build_normal_response_data_for_entities(record, response_dict, context, data, app)
   except Exception as e:
     app.logger.error("Error: build_response_data_for_entities")
     app.logger.error(traceback.format_exc())
+    error = 'Error in building response data for entities'
   return response_data, status, error
 
 def build_normal_response_data_for_entities(record_list, response_dict, context, data, app):
@@ -32,7 +33,7 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
   compacted_dict = {}
   response_data = []
   status = 0
-  error = 'Error in building normal response data for entities.'
+  error = ''
   attrs_list = []
   attrs_index = []
   entity_val = {'id': 0, 'type':1, 'location':2 ,'createdAt':3, 'modifiedAt':4, 'observedAt':5}
@@ -40,6 +41,9 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
   subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
   try:
     for record in record_list:
+      if data['idPattern']:
+        if not re.search(data['idPattern'], record[entity_val['id']]):
+          continue
       response_keys = response_dict.keys()
       if record[entity_val['id']] not in response_keys:
         response_dict[record[entity_val['id']]] = {}
@@ -63,7 +67,7 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
           response_dict[record[entity_val['id']]]['@context'] = default_context
       elif 'lastN' in data and data['lastN'] and len(response_keys) >= data['lastN']:
         continue
-      if (not data['attrs']) or (data['attrs'] and record[attr_val['id']] in data['attrs']):
+      if record[attr_val['id']] != None:
         attr = compact_entities_params(record[attr_val['id']], context, compacted_dict, app)
         if attr not in response_dict[record[entity_val['id']]].keys():
           response_dict[record[entity_val['id']]][attr] = []
@@ -100,9 +104,11 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
           response_dict[record[entity_val['id']]][attr][attrs_index[index]][subattr] = subattr_dict
     status = 1
     response_data = list(response_dict.values())
+    app.logger.info(len(response_data))
   except Exception as e:
     app.logger.error("Error: build_normal_response_data_for_entities")
     app.logger.error(traceback.format_exc())
+    error = 'Error in building normal response data for entities.'
   return response_data, status, error
 
 def build_temporal_response_data_for_entities(record_list, response_dict, context, data, app):
@@ -111,12 +117,15 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
   compacted_dict = {}
   response_data = []
   status = 0
+  error = ''
   entity_val = {'id': 0, 'type':1, 'location':2 ,'createdAt':3, 'modifiedAt':4, 'observedAt':5}
-  error = 'Error in building temporal response data for entities'
   attr_val = {'id': 7, 'value_type': 8, 'sub_property': 9, 'unit_code': 10, 'data_set_id': 11, 'value_string': 13,  'value_boolean': 14, 'value_number':15, 'value_relation': 16, 'value_object':17, 'location':18 ,'createdAt':19, 'modifiedAt':20, 'observedAt':21, 'value_datetime':32}
   subattr_val = {'id': 23, 'value_type': 24, 'value_string': 25,  'value_boolean': 26, 'value_number':27, 'value_relation': 28, 'location':29 , 'value_object':30, 'unit_code': 31, 'value_datetime':33}
   try:
     for record in record_list:
+      if data['idPattern']:
+        if not re.search(data['idPattern'], record[entity_val['id']]):
+          continue
       response_keys = response_dict.keys()
       if record[entity_val['id']] not in response_keys:
         response_dict[record[entity_val['id']]] = {}
@@ -140,7 +149,7 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
           response_dict[record[entity_val['id']]]['@context'] = default_context
       elif 'lastN' in data and data['lastN'] and len(response_keys) >= data['lastN']:
         continue
-      if (not data['attrs']) or (data['attrs'] and record[attr_val['id']] in data['attrs']):
+      if record[attr_val['id']] != None:
         attr = compact_entities_params(record[attr_val['id']], context, compacted_dict, app)
         if attr not in response_dict[record[entity_val['id']]].keys():
           response_dict[record[entity_val['id']]][attr] = {'type': '', 'value': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'value': []}}
@@ -189,6 +198,7 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
   except Exception as e:
     app.logger.error("Error: build_temporal_response_data_for_entities")
     app.logger.error(traceback.format_exc())
+    error = 'Error in building temporal response data for entities'
   return response_data, status, error
 
 def compact_entities_params(attr, context, compacted_dict, app):
@@ -197,23 +207,24 @@ def compact_entities_params(attr, context, compacted_dict, app):
   attr_key = attr
   default_context_compact = 'https://uri.etsi.org/ngsi-ld/default-context/'
   try:
-    if attr in compacted_dict:
-      return compacted_dict[attr]
-    if default_context_compact in attr:
-      attr = attr.replace(default_context_compact, '')
+    if attr:
+      if attr in compacted_dict:
+        return compacted_dict[attr]
+      if default_context_compact in attr:
+        attr = attr.replace(default_context_compact, '')
+        compacted_dict[attr_key] = attr
+        return attr
+      if context:
+        if context in app.context_dict.keys():
+          context_list.append(app.context_dict[context])
+        else:
+          context_list.append(context)
+      context_list.append(app.context_dict[default_context])
+      con = {"@context": context_list}
+      com =  {attr: attr}
+      compacted = jsonld.compact(com, con)
+      attr = list(compacted.keys())[1]
       compacted_dict[attr_key] = attr
-      return attr
-    if context:
-      if context in app.context_dict.keys():
-        context_list.append(app.context_dict[context])
-      else:
-        context_list.append(context)
-    context_list.append(app.context_dict[default_context])
-    con = {"@context": context_list}
-    com =  {attr: attr}
-    compacted = jsonld.compact(com, con)
-    attr = list(compacted.keys())[1]
-    compacted_dict[attr_key] = attr
   except Exception as e:
     app.logger.error("Error: compact_entities_params")
     app.logger.error(traceback.format_exc())
@@ -265,7 +276,7 @@ def build_sql_query_for_q_with_sub_attribute(statement, params, q_params, count,
   params[attr_value] = q_params['attribute']
   params[sub_value] = q_params['sub-attribute']
   if count == 0:
-    statement += ' AND ' + st
+    statement +=  st
   else:
     statement += ' OR ' + st   
   return statement, params
@@ -313,7 +324,7 @@ def build_sql_query_for_q_with_attribute(statement, params, q_params, count, q_t
   st = st.replace('attr_value', attr_value)
   params[attr_value] = q_params['attribute']
   if count == 0:
-    statement += ' AND ' + st
+    statement += st
   else:
     statement += ' OR ' + st   
   return statement, params
@@ -349,7 +360,7 @@ def build_sql_query_for_q_for_dict_for_range(statement, params, q_params, count,
     st = attributes_range_statement.replace('low_range_value', low_range_value).replace('high_range_value',high_range_value)
   st = st.replace('attr_value', attr_value)
   if count == 0:
-    statement += ' AND ' + st
+    statement +=  st
   else:
     statement += ' OR ' + st   
   return statement, params
@@ -366,7 +377,7 @@ def build_sql_query_for_q_for_dict_for_having(statement, params, q_params, count
     st = attributes_having_statement
   st = st.replace('attr_value', attr_value)
   if count == 0:
-    statement += ' AND ' + st
+    statement += st
   else:
     statement += ' OR ' + st      
   return statement, params
@@ -374,7 +385,7 @@ def build_sql_query_for_q_for_dict_for_having(statement, params, q_params, count
 def build_sql_query_for_q_for_dict(statement, params, q_params, count, q_type, app):
   """Build sql query for q param"""
   status = 0
-  error = 'Error in building sql query for entities for q param.'
+  error = ''
   try:
     if q_params['operation'] == 'having':
       statement, params = build_sql_query_for_q_for_dict_for_having(statement, params, q_params, count, q_type)
@@ -386,6 +397,7 @@ def build_sql_query_for_q_for_dict(statement, params, q_params, count, q_type, a
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_q_for_dict")
     app.logger.error(traceback.format_exc())
+    error = 'Error in building sql query for entities for q param.'
   return statement, params, status, error
 
 def build_sql_query_for_q_list_with_sub_attribute(statement, params, q_params, count, q_type):
@@ -530,7 +542,7 @@ def build_sql_query_for_q_for_list_for_having(statement, params, q_params, count
 def build_sql_query_for_q_for_list(statement, params, q_params, count, q_type, app):
   """Build sql query for q param"""
   status = 0
-  error = 'Error in building sql query for entities for q param.'
+  error = ''
   try:
     if q_params['operation'] == 'having':
       statement, params = build_sql_query_for_q_for_list_for_having(statement, params, q_params, count, q_type)
@@ -542,15 +554,16 @@ def build_sql_query_for_q_for_list(statement, params, q_params, count, q_type, a
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_q_for_list")
     app.logger.error(traceback.format_exc())
+    error = 'Error in building sql query for entities for q param.'
   return statement, params, status, error
 
 
-def build_sql_query_for_q(statement, params, q_params, attributes, app):
+def build_sql_query_for_q(statement, params, q_params, data, attributes, app):
   """Build sql query for q param"""
   status = 0
+  error = ''
   q_dict = 'q_dict'
   q_list = 'q_list'
-  error = 'Error in building sql query for entities for q param.'
   attr_statement = attributes_having_statement
   sub_statement = sub_attributes_having_statement
   sub_attribute_flag = 0 
@@ -558,13 +571,15 @@ def build_sql_query_for_q(statement, params, q_params, attributes, app):
     q_len = len(q_params)
     for count in range(0, q_len):
       if type(q_params[count]) is dict:
+        if count == 0:
+          statement += ' AND ('
         statement, params, status, error = build_sql_query_for_q_for_dict(statement, params, q_params[count], count, q_dict, app)
         attributes.append(q_params[count]['attribute'])
         if not status:
           return statement, params, attributes, status, error
       else:
         if count == 0:
-          statement += ' AND ('
+          statement += ' AND (('
         else:
           statement += ' OR ('
         for index in range(0, len(q_params[count])):
@@ -577,18 +592,189 @@ def build_sql_query_for_q(statement, params, q_params, attributes, app):
           else:
             statement += ' ' + q_params[count][index] + ' '
         statement += ' )'
+    if data['geoproperty'] != 'geo_property':
+      statement, params, attributes, status, error = build_sql_query_for_geoproperty_for_attributes(statement, params, data, attributes, app)
+    statement += ' )'
     status = 1
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_q")
     app.logger.error(traceback.format_exc())
+    error = 'Error in building sql query for entities for q param.'
   return statement, params, attributes, status, error
 
-def build_sql_query_for_entities(data, app):
+def build_sql_query_for_geoproperty_for_attributes(statement, params, data, attributes, app):
+  """Build sql query for geoproperty"""
+  status = 0
+  error = ''
+  geo_property_dict = {'near_maxDistance': attrubutes_geo_dwithin, 'near_minDistance': attrubutes_geo_not_dwithin, 'within': attrubutes_geo_within, 'contains': attrubutes_geo_contains, 'intersects': attrubutes_geo_intersects, 'equals': attrubutes_geo_equals, 'disjoint': attrubutes_geo_disjoint, 'overlaps': attrubutes_geo_overlaps}
+  try:
+    statement += ' OR ' + geo_property_dict[data['georel']]
+    if data['georel'] in ['near_maxDistance', 'near_minDistance']:
+      params["geo_distance"] = data['near_distance']
+    params['geo_property'] = str({"type": data['geometry'], "coordinates": data['coordinates']})
+    params['geo_attr_value'] = data['geoproperty']
+    attributes.append(data['geoproperty'])
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: build_sql_query_for_geoproperty_for_attributes")
+    app.logger.error(traceback.format_exc())
+    error = 'Error in building sql query for geoproperty.'
+  return statement, params, attributes, status, error
+
+def build_sql_query_for_geoproperty_for_entity(statement, params, data, app):
+  """Build sql query for geoproperty"""
+  status = 0
+  error = ''
+  geo_property_dict = {'near_maxDistance': entity_geo_dwithin, 'near_minDistance': entity_geo_not_dwithin, 'within': entity_geo_within, 'contains': entity_geo_contains, 'intersects': entity_geo_intersects, 'equals': entity_geo_equals, 'disjoint': entity_geo_disjoint, 'overlaps': entity_geo_overlaps}
+  try:
+    statement += ' AND ' + geo_property_dict[data['georel']]
+    if data['georel'] in ['near_maxDistance', 'near_minDistance']:
+      params["geo_distance"] = data['near_distance']
+    params['geo_property'] = str({"type": data['geometry'], "coordinates": data['coordinates']})
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: build_sql_query_for_geoproperty_for_entity")
+    app.logger.error(traceback.format_exc())
+    error = 'Error in building sql query for geoproperty.'
+  return statement, params, status, error
+
+
+def get_entities_ids_from_records(data, records, attributes):
+  """Get entities ids from records"""
+  entity_ids = []
+  records_dict = {}
+  records_data = []
+  attr_val = {'entity_id': 0, 'attr_id': 7}
+  if data['attrs'] and len(data['attrs']) > 0:
+    for record in records:
+      if record[attr_val['entity_id']] not in records_dict.keys():
+        records_dict[record[attr_val['entity_id']]] = {'value': [], 'attrs': {record[attr_val['attr_id']]}}
+      else:
+        records_dict[record[attr_val['entity_id']]]['attrs'].add(record[attr_val['attr_id']])
+      if record[attr_val['attr_id']] in data['attrs']: 
+        records_dict[record[attr_val['entity_id']]]['value'].append(record)
+  else:
+    for record in records:
+      if record[attr_val['entity_id']] not in records_dict.keys():
+        records_dict[record[attr_val['entity_id']]] = {'value': [record], 'attrs': {record[attr_val['attr_id']]}}
+      else:
+        records_dict[record[attr_val['entity_id']]]['value'].append(record)
+        records_dict[record[attr_val['entity_id']]]['attrs'].add(record[attr_val['attr_id']])
+  attributes = list(set(attributes))
+  attrs_len = len(attributes)
+  if data['id_data'] and len(data['id_data']) > 0:
+    for key, value in records_dict.items():
+      if len(value['attrs']) == attrs_len and key in data['id_data']:
+        records_data.extend(value['value'])
+        entity_ids.append(key)
+  else:
+    for key, value in records_dict.items():
+      if len(value['attrs']) == attrs_len:
+        records_data.extend(value['value'])
+        entity_ids.append(key)
+  return records_data, attributes, entity_ids
+
+
+def build_sql_query_for_entities_after_attributes(data, records, attributes, app):
+  """Build sql query"""
+  status = 0
+  error = ''
+  try:
+    records_data, attributes, entity_ids = get_entities_ids_from_records(data, records, attributes)
+    statement, params, status, error = sql_query_for_entities(data, app)
+    if not status:
+      return statement, params, records_data, status, error
+    if data['type_data'] and len(data['type_data']) > 0:
+      statement += ' AND entity_table.entity_type in ('
+      for index in range(0,len(data['type_data'])):
+        if index == (len(data['type_data']) -1):
+          statement += '%(type_data'+str(index)+')s'
+        else:
+          statement += '%(type_data'+str(index)+')s,'
+        params['type_data'+str(index)] = data['type_data'][index]
+      statement += ')'
+    if data['attrs'] and len(data['attrs']) > 0:
+      statement += ' AND attributes_table.id in ('
+      for index in range(0,len(data['attrs'])):
+        if index == (len(data['attrs']) -1):
+          statement += '%(attrs'+str(index)+')s'
+        else:
+          statement += '%(attrs'+str(index)+')s,'
+        params['attrs'+str(index)] = data['attrs'][index]
+      statement += ')'
+    statement += ' AND attributes_table.entity_id in ('
+    for index in range(0,len(entity_ids)):
+      if index == (len(entity_ids) -1):
+        statement += '%(id_data'+str(index)+')s'
+      else:
+        statement += '%(id_data'+str(index)+')s,'
+      params['id_data'+str(index)] = entity_ids[index]
+    statement += ')'
+    statement += ' AND attributes_table.id NOT in ('
+    for index in range(0,len(attributes)):
+      if index == (len(attributes) -1):
+        statement += '%(attrs_not'+str(index)+')s'
+      else:
+        statement += '%(attrs_not'+str(index)+')s,'
+      params['attrs_not'+str(index)] = attributes[index]
+    statement += ')'
+    statement +=" order by entity_table."+ data['timeproperty']+" desc" 
+    statement += "%s"%(";")
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: build_sql_query_for_entities_after_attributes")
+    app.logger.error(traceback.format_exc())
+    error = 'Error in building sql query for entities.'
+  return statement, params, records_data, status, error
+
+
+def build_sql_query_for_entities_with_attributes(data, cursor, run_sql, app):
+  """Build sql query"""
+  status = 0
+  run_sql = 0
+  error = ''
+  records_data = []
+  attributes = []
+  try:
+    statement, params, status, error = sql_query_for_entities(data, app)
+    if not status:
+      return statement, params, records_data, run_sql, status, error
+    if data['type_data'] and len(data['type_data']) > 0:
+      statement += ' AND entity_table.entity_type in ('
+      for index in range(0,len(data['type_data'])):
+        if index == (len(data['type_data']) -1):
+          statement += '%(type_data'+str(index)+')s'
+        else:
+          statement += '%(type_data'+str(index)+')s,'
+        params['type_data'+str(index)] = data['type_data'][index]
+      statement += ')'
+    if data['q']:
+      statement, params, attributes, status, error = build_sql_query_for_q(statement, params, data['q'], data, attributes, app)
+      if not status:
+        return statement, params, records, run_sql, status, error
+    statement +=" order by entity_table."+ data['timeproperty']+" desc" 
+    statement += "%s"%(";")
+    cursor.execute(statement, params)
+    records = cursor.fetchall()
+    if len(records) == 0:
+      status = 1
+      return statement, params, records_data, run_sql, status, error
+    else:
+      run_sql = 1
+      statement, params, records_data, status, error = build_sql_query_for_entities_after_attributes(data, records, attributes, app)
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: build_sql_query_for_entities_with_attributes")
+    app.logger.error(traceback.format_exc())
+    error = 'Error in building sql query for entities.'
+  return statement, params, records_data, run_sql, status, error
+
+def sql_query_for_entities(data, app):
   """Build sql query"""
   statement = start_statement
   params = {}
   status = 0
-  error = 'Error in building sql query for entities.'
+  error = ''
   try:
     if data['timerel'] == 'after':
       statement += " WHERE entity_table."+ data['timeproperty']+">%(time)s"
@@ -600,8 +786,27 @@ def build_sql_query_for_entities(data, app):
       statement += " WHERE entity_table."+ data['timeproperty']+">=%(time)s AND entity_table."+ data['timeproperty']+"<%(endtime)s"
       params["time"] = data['time']
       params["endtime"] = data['endtime']
+    if data['coordinates'] and data['geoproperty'] == 'geo_property':
+      statement, params,status, error = build_sql_query_for_geoproperty_for_entity(statement, params, data, app)
+      if not status:
+        return statement, params,status, error
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: build_sql_query_for_entities_without_attributes")
+    app.logger.error(traceback.format_exc())
+    error = 'Error in building sql query for entities without attributes.'
+  return statement, params, status, error
+
+def build_sql_query_for_entities_without_attributes(data, cursor, app):
+  """Build sql query"""
+  status = 0
+  error = ''
+  try:
+    statement, params, status, error = sql_query_for_entities(data, app)
+    if not status:
+      return statement, params,status, error
     if data['id_data'] and len(data['id_data']) > 0:
-      statement += ' AND entity_table.entity_id in ('
+      statement += ' AND attributes_table.entity_id in ('
       for index in range(0,len(data['id_data'])):
         if index == (len(data['id_data']) -1):
           statement += '%(id_data'+str(index)+')s'
@@ -618,52 +823,7 @@ def build_sql_query_for_entities(data, app):
           statement += '%(type_data'+str(index)+')s,'
         params['type_data'+str(index)] = data['type_data'][index]
       statement += ')'
-    if data['idPattern']:
-      statement += " AND entity_table.entity_id like %(idPattern)s"
-      params["idPattern"] = '%{}%'.format(data['idPattern'])
-    attributes = []
-    if data['q']:
-      statement, params, attributes, status, error = build_sql_query_for_q(statement, params, data['q'], attributes, app)
-      if not status:
-        return statement, params, status, error
-    run_attr = 1
-    if len(attributes) > 0:
-      attr_flag = 0
-      run_attr = 0
-      run_not_attr = 1
-      if data['attrs'] and len(data['attrs']) > 0:
-        run_not_attr = 0
-        for attr in data['attrs']:
-          if attr not in attributes:
-            attr_flag = 1
-            break
-      if attr_flag:
-        statement += ' OR (attributes_table.id in ('
-        for index in range(0,len(data['attrs'])):
-          if index == (len(data['attrs']) -1):
-            statement += '%(attrs'+str(index)+')s'
-          else:
-            statement += '%(attrs'+str(index)+')s,'
-          params['attrs'+str(index)] = data['attrs'][index]
-        statement += ') AND '
-        statement += 'attributes_table.id not in ('
-        for index in range(0,len(attributes)):
-          if index == (len(attributes) -1):
-            statement += '%(attributes'+str(index)+')s'
-          else:
-            statement += '%(attributes'+str(index)+')s,'
-          params['attributes'+str(index)] = attributes[index]
-        statement += '))'
-      elif run_not_attr:
-        statement += ' OR (attributes_table.id not in ('
-        for index in range(0,len(attributes)):
-          if index == (len(attributes) -1):
-            statement += '%(attributes'+str(index)+')s'
-          else:
-            statement += '%(attributes'+str(index)+')s,'
-          params['attributes'+str(index)] = attributes[index]
-        statement += '))'
-    if run_attr and data['attrs'] and len(data['attrs']) > 0:
+    if data['attrs'] and len(data['attrs']) > 0:
       statement += ' AND attributes_table.id in ('
       for index in range(0,len(data['attrs'])):
         if index == (len(data['attrs']) -1):
@@ -675,19 +835,78 @@ def build_sql_query_for_entities(data, app):
     statement +=" order by entity_table."+ data['timeproperty']+" desc" 
     statement += "%s"%(";")
     status = 1
-    app.logger.info(statement)
-    app.logger.info(params)
+  except Exception as e:
+    app.logger.error("Error: build_sql_query_for_entities_without_attributes")
+    app.logger.error(traceback.format_exc())
+    error = 'Error in building sql query for entities without attributes.'
+  return statement, params, status, error
+
+def build_sql_query_for_entities(data, cursor, app):
+  """Build sql query"""
+  statement = start_statement
+  params = {}
+  attributes = []
+  status = 0
+  error = ''
+  run_sql = 1
+  records = []
+  try:
+    if (data['q']) or (data['coordinates'] and  data['geoproperty'] != 'geo_property'):
+      statement, params, records, run_sql, status, error = build_sql_query_for_entities_with_attributes(data, cursor, run_sql, app)
+    else:
+      statement, params, status, error = build_sql_query_for_entities_without_attributes(data, cursor, app)
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_entities")
     app.logger.error(traceback.format_exc())
-  return statement, params, status, error
+    error = 'Error in building sql query for entities.'
+  return statement, params, records, run_sql, status, error
+
+def parse_geo_properties(data, args, app):
+  """Parse geo params"""
+  status = 0
+  error = ''
+  try:
+    if 'georel' in args and args.get('georel'):
+      georel = args.get('georel')
+      if 'near' in georel:
+        data['georel'] = 'near'
+        if 'maxDistance' in georel:
+          data['georel'] += '_maxDistance'
+        elif 'minDistance' in georel:
+          data['georel'] += '_minDistance'
+        else:
+          error = 'Error in parsing geo params: maxDistance or minDistance'
+          return data, status, error
+        data['near_distance'] = georel.split('==')[1]
+      else:
+        data['georel'] = georel
+    if 'coordinates' in args and args.get('coordinates'):
+      data['coordinates'] = eval(args.get('coordinates'))
+    if 'geometry' in args and args.get('geometry'):
+      data['geometry'] = args.get('geometry')
+    if (data['georel'] != None and (data['geometry'] == None or data['coordinates'] == None)) or (data['geometry'] != None and (data['georel'] == None or data['coordinates'] == None)) or (data['coordinates'] != None and (data['geometry'] == None or data['georel'] == None)):
+      error = 'Error in parsing geo params: params not correct'
+      return data, status, error
+    else:
+      if 'geoproperty' in args and args.get('geoproperty'):
+        data['geoproperty'] = args.get('geoproperty')
+        if data['geoproperty'] == 'location':
+          data['geoproperty'] = 'geo_property'
+      else:
+        data['geoproperty'] = 'geo_property'
+    status = 1
+  except Exception as e:
+    app.logger.error("Error: parse_geo_properties")
+    app.logger.error(traceback.format_exc())
+    error = 'Error in parsing geo params'
+  return data, status, error
 
 def get_temporal_entities_parameters(args, context, app):
   """Parse params"""
   data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None, 'id_data': '', 'type_data': '','idPattern': None, 'q':None, 'csf':None, 'georel': None, 'geometry': None, 'coordinates': None, 'geoproperty': None}
   timepropertyDict = {'modifiedAt':'modified_at', 'observedAt' :'observed_at', 'createdAt':'created_at'}
   status = 0
-  error = 'Error in getting temporal entities parameters.'
+  error = ''
   try:
     if 'timerel' in args:
       data['timerel'] = args.get('timerel')
@@ -716,14 +935,9 @@ def get_temporal_entities_parameters(args, context, app):
         return data, status, error
     if 'csf' in args and args.get('csf'):
       data['csf'] = args.get('csf')
-    if 'georel' in args and args.get('georel'):
-      data['georel'] = args.get('georel')
-    if 'geometry' in args and args.get('geometry'):
-      data['geometry'] = args.get('geometry')
-    if 'coordinates' in args and args.get('coordinates'):
-      data['coordinates'] = args.get('coordinates')
-    if 'geoproperty' in args and args.get('geoproperty'):
-      data['geoproperty'] = args.get('geoproperty')
+    data, status, error = parse_geo_properties(data, args, app)
+    if not status:
+      return data, status, error
     if 'id' in args:
       ids = args.get('id')
       if ids:
@@ -738,12 +952,13 @@ def get_temporal_entities_parameters(args, context, app):
   except Exception as e:
     app.logger.error("Error: get_temporal_entities_parameters")
     app.logger.error(traceback.format_exc())
+    error = 'Error in getting temporal entities parameters.'
   return data, status, error
 
 def get_q_params_in_list(start, count, param, q, app):
   """Covert q params to list"""
   status = 0
-  error = 'Error in get q params in list'
+  error = ''
   try:
     end = count
     if end != 0 and start != (end -1):
@@ -756,12 +971,12 @@ def get_q_params_in_list(start, count, param, q, app):
   except Exception as e:
     app.logger.error("Error: get_q_params_in_list")
     app.logger.error(traceback.format_exc())
+    error = 'Error in get q params in list'
   return start, end, status, error
 
 def parse_q_multiple(param, app):
   """Parse q params"""
   status = 0
-  error = 'Error in parsing q miltiple params'
   q = []
   q_len = len(param)
   count = 0
@@ -794,14 +1009,15 @@ def parse_q_multiple(param, app):
   except Exception as e:
     app.logger.error("Error: parse_q_multiple")
     app.logger.error(traceback.format_exc())
+    error = 'Error in parsing q miltiple params'
   return q, status, error
 
 def parse_q_single(param, app):
   """Parse q params"""
   op_list = ['==', '!=', '>=','<=','>', '<','!~=','~=']
   status = 0
+  error = ''
   q = {}
-  error = 'Error in parsing q single params.'
   try:
     flag = 0
     for op in op_list:
@@ -844,13 +1060,14 @@ def parse_q_single(param, app):
   except Exception as e:
     app.logger.error("Error: parse_q_single")
     app.logger.error(traceback.format_exc())
+    error = 'Error in parsing q single params.'
   return q, status, error
 
 def get_q_params(data, app):
   """Parse q params"""
   op_list = ['==', '!=', '>=','<=','>', '<','!~=','~=']
   status = 0
-  error = 'Error in parsing q params'
+  error = ''
   try:
     if '(' in data['q']:
       params, status, error = split_q_params(data['q'].replace(' ', ''), app)
@@ -875,13 +1092,14 @@ def get_q_params(data, app):
   except Exception as e:
     app.logger.error("Error: get_q_params")
     app.logger.error(traceback.format_exc())
+    error = 'Error in parsing q params'
   return data, status, error
 
 def split_q_params(q_params, app):
   """Parse q params"""
   q = []
   status = 0
-  error = 'Error in split q params'
+  error = ''
   try:
     q_params = q_params.replace(' ','')
     start = 0
@@ -922,6 +1140,7 @@ def split_q_params(q_params, app):
   except Exception as e:
     app.logger.error("Error: split_q_params")
     app.logger.error(traceback.format_exc())
+    error = 'Error in split q params'
   return q, status, error
 
 
@@ -929,7 +1148,7 @@ def expand_entities_params(data, context, app):
   """Expand entities params"""
   context_list = []
   status = 0
-  error = 'Error in expanding entities params.'
+  error = ''
   try:
     if context:
       if context in app.context_dict.keys():
@@ -943,6 +1162,10 @@ def expand_entities_params(data, context, app):
           com = {"@context": context_list, data['attrs'][count]: data['attrs'][count]}
           expanded = jsonld.expand(com)
           data['attrs'][count] = list(expanded[0].keys())[0]
+    if data['geoproperty'] and data['geoproperty'] !='geo_property':
+      com = {"@context": context_list, data['geoproperty']: data['geoproperty']}
+      expanded = jsonld.expand(com)
+      data['geoproperty'] = list(expanded[0].keys())[0]
     if data['type_data']:
       for count in range(0, len(data['type_data'])):
         if not validators.url(data['type_data'][count]):
@@ -975,4 +1198,5 @@ def expand_entities_params(data, context, app):
   except Exception as e:
     app.logger.error("Error: expand_entities_params")
     app.logger.error(traceback.format_exc())
+    error = 'Error in expanding entities params.'
   return data, status, error

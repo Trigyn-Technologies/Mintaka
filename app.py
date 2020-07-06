@@ -40,18 +40,21 @@ def get_temporal_entities():
       return Response("Wrong timerel property", status=400, )
     if data['timerel'] == 'between' and (not data['endtime']):
       return Response("Wrong endtime value", status=400, )
-    statement, params, status, error = build_sql_query_for_entities(data, app)
+    statement, params, records, run_sql, status, error = build_sql_query_for_entities(data, cursor, app)
     if not status:
       return Response(error, status=400, )
-    cursor.execute(statement, params)
-    record = cursor.fetchall()
-    app.logger.info(len(record))
-    if len(record):
-      response_data , status, error= build_response_data_for_entities(record, context, data, app)
-      if not status:
-        return Response(error, status=400, )
+    if run_sql:
+      cursor.execute(statement, params)
+      record = cursor.fetchall()
+      record.extend(records)
+      if len(record):
+        response_data , status, error= build_response_data_for_entities(record, context, data, app)
+        if not status:
+          return Response(error, status=400, )
+      else:
+        response_data = []
     else:
-      response_data = {}
+      response_data = []
     response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
     status, error = close_postgres_connection(cursor, conn, app)
     if not status:
@@ -93,7 +96,6 @@ def get_temporal_entity(entity_id):
       return Response(error, status=400, )
     cursor.execute(statement,params)
     record = cursor.fetchall()
-    app.logger.info(len(record))
     if len(record):
       response_data , status, error= build_response_data_for_entity(record, context, data, app)
       if not status:
