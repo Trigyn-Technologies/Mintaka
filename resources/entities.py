@@ -104,7 +104,6 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
           response_dict[record[entity_val['id']]][attr][attrs_index[index]][subattr] = subattr_dict
     status = 1
     response_data = list(response_dict.values())
-    app.logger.info(len(response_data))
   except Exception as e:
     app.logger.error("Error: build_normal_response_data_for_entities")
     app.logger.error(traceback.format_exc())
@@ -602,13 +601,13 @@ def build_sql_query_for_q(statement, params, q_params, data, attributes, app):
     error = 'Error in building sql query for entities for q param.'
   return statement, params, attributes, status, error
 
-def build_sql_query_for_geoproperty_for_attributes(statement, params, data, attributes, app):
+def build_sql_query_for_geoproperty_for_attributes(statement, params, data, attributes, app, logic = 'OR'):
   """Build sql query for geoproperty"""
   status = 0
   error = ''
   geo_property_dict = {'near_maxDistance': attrubutes_geo_dwithin, 'near_minDistance': attrubutes_geo_not_dwithin, 'within': attrubutes_geo_within, 'contains': attrubutes_geo_contains, 'intersects': attrubutes_geo_intersects, 'equals': attrubutes_geo_equals, 'disjoint': attrubutes_geo_disjoint, 'overlaps': attrubutes_geo_overlaps}
   try:
-    statement += ' OR ' + geo_property_dict[data['georel']]
+    statement += ' '+ logic +' ' + geo_property_dict[data['georel']]
     if data['georel'] in ['near_maxDistance', 'near_minDistance']:
       params["geo_distance"] = data['near_distance']
     params['geo_property'] = str({"type": data['geometry'], "coordinates": data['coordinates']})
@@ -752,6 +751,11 @@ def build_sql_query_for_entities_with_attributes(data, cursor, run_sql, app):
       statement, params, attributes, status, error = build_sql_query_for_q(statement, params, data['q'], data, attributes, app)
       if not status:
         return statement, params, records, run_sql, status, error
+    else:
+      if data['geoproperty'] != 'geo_property':
+        statement, params, attributes, status, error = build_sql_query_for_geoproperty_for_attributes(statement, params, data, [], app, 'AND')
+        if not status:
+          return statement, params, records, run_sql, status, error
     statement +=" order by entity_table."+ data['timeproperty']+" desc" 
     statement += "%s"%(";")
     cursor.execute(statement, params)
