@@ -151,7 +151,7 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
       if record[attr_val['id']] != None:
         attr = compact_entities_params(record[attr_val['id']], context, compacted_dict, app)
         if attr not in response_dict[record[entity_val['id']]].keys():
-          response_dict[record[entity_val['id']]][attr] = {'type': '', 'values': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'values': []}}
+          response_dict[record[entity_val['id']]][attr] = {'type': '', 'values': []}
         elif 'lastN' in data and data['lastN'] and len(response_dict[record[entity_val['id']]][attr]['values']) >= data['lastN']:
           continue
         attr_list = []
@@ -174,24 +174,6 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
             attr_list.append('')
         if attr_list not in response_dict[record[entity_val['id']]][attr]['values']:
           response_dict[record[entity_val['id']]][attr]['values'].append(attr_list)
-          if record[attr_val['unit_code']]:
-            response_dict[record[entity_val['id']]][attr]['unitCode'].append(record[attr_val['unit_code']])
-          else:
-            response_dict[record[entity_val['id']]][attr]['unitCode'].append('')
-          if record[attr_val['location']]:
-            response_dict[record[entity_val['id']]][attr]['location']['values'].append(json.loads(record[attr_val['location']]))
-          else:
-            response_dict[record[entity_val['id']]][attr]['location']['values'].append('')
-        if record[attr_val['sub_property']] and record[subattr_val['id']]:
-          subattr = compact_entities_params(record[subattr_val['id']], context, compacted_dict, app)
-          if subattr not in response_dict[record[entity_val['id']]][attr].keys():
-            response_dict[record[entity_val['id']]][attr][subattr] = {'type': '', 'values': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'values': []}}
-          if record[subattr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
-            subattr_list = get_attr_val_dict[record[subattr_val['value_type']]](record, subattr_val, response_dict[record[entity_val['id']]][attr][subattr]['values'], response_dict[record[entity_val['id']]][attr], subattr)
-          if record[subattr_val['unit_code']]:
-            response_dict[record[entity_val['id']]][attr][subattr]['unitCode'].append(record[subattr_val['unit_code']])
-          if record[subattr_val['location']]:
-            response_dict[record[entity_val['id']]][attr][subattr]['location']['values'].append({"type": "GeoProperty", 'value': json.loads(record[subattr_val['location']])})
     status = 1
     response_data = list(response_dict.values())
   except Exception as e:

@@ -108,7 +108,7 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
     for record in record_list:
       attr = compact_entity_params(record[attr_val['id']], context, compacted_dict, app)
       if attr not in response_data.keys():
-        response_data[attr] = {'type': '', 'values': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'values': []}}
+        response_data[attr] = {'type': '', 'values': []}
       elif 'lastN' in data and data['lastN'] and len(response_data[attr]['values']) >= data['lastN']:
         continue
       attr_list = []
@@ -129,27 +129,8 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
           attr_list.append(record[attr_val['modifiedAt']].replace(' ', ''))
         else:
           attr_list.append('')
-      
       if attr_list not in response_data[attr]['values']:
         response_data[attr]['values'].append(attr_list)
-        if record[attr_val['unit_code']]:
-          response_data[attr]['unitCode'].append(record[attr_val['unit_code']])
-        else:
-          response_data[attr]['unitCode'].append('')
-        if record[attr_val['location']]:
-          response_data[attr]['location']['values'].append(json.loads(record[attr_val['location']]))
-        else:
-          response_data[attr]['location']['values'].append('')
-      if record[attr_val['sub_property']] and record[subattr_val['id']]:
-        subattr = compact_entity_params(record[subattr_val['id']], context, compacted_dict, app)
-        if subattr not in response_data[attr].keys():
-          response_data[attr][subattr] = {'type': '', 'values': [], 'unitCode': [], 'location': {'type': 'GeoProperty', 'values': []}}
-        if record[subattr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
-          subattr_list = get_attr_val_dict[record[subattr_val['value_type']]](record, subattr_val, response_data[attr][subattr]['values'], response_data[attr], subattr)
-        if record[subattr_val['unit_code']]:
-          response_data[attr][subattr]['unitCode'].append(record[subattr_val['unit_code']])
-        if record[subattr_val['location']]:
-          response_data[attr][subattr]['location']['values'].append({"type": "GeoProperty", 'value': json.loads(record[subattr_val['location']])})
     status = 1
   except Exception as e:
     app.logger.error("Error: build_temporal_response_data_for_entity")
