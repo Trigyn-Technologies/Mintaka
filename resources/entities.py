@@ -49,16 +49,10 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
         response_dict[record[entity_val['id']]] = {}
         response_dict[record[entity_val['id']]]['id'] = record[entity_val['id']]
         response_dict[record[entity_val['id']]]['type'] = compact_entities_params(record[entity_val['type']], context, {} ,app)
-        if 'options' in data and data['options'] == 'sysAttrs':
-          if record[entity_val['createdAt']]:
-            response_dict[record[entity_val['id']]]['createdAt'] = record[entity_val['createdAt']].replace(' ','')
-          if record[entity_val['modifiedAt']]:
-            response_dict[record[entity_val['id']]]['modifiedAt'] = record[entity_val['modifiedAt']].replace(' ','')
-          if record[entity_val['observedAt']]:
-            response_dict[record[entity_val['id']]]['observedAt'] = record[entity_val['observedAt']].replace(' ','')
-        else:
-          if record[entity_val['observedAt']]:
-            response_dict[record[entity_val['id']]]['observedAt'] = record[entity_val['observedAt']].replace(' ','')
+        if record[entity_val['createdAt']]:
+          response_dict[record[entity_val['id']]]['createdAt'] = record[entity_val['createdAt']].replace(' ','')
+        if record[entity_val['modifiedAt']]:
+          response_dict[record[entity_val['id']]]['modifiedAt'] = record[entity_val['modifiedAt']].replace(' ','')
         if record[entity_val['location']]:
           response_dict[record[entity_val['id']]]['location'] = {"type": "GeoProperty", 'value': json.loads(record[entity_val['location']])}
         if context:
@@ -130,16 +124,10 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
         response_dict[record[entity_val['id']]] = {}
         response_dict[record[entity_val['id']]]['id'] = record[entity_val['id']]
         response_dict[record[entity_val['id']]]['type'] = compact_entities_params(record[entity_val['type']], context, {} ,app)
-        if 'options' in data and data['options'] == 'sysAttrs':
-          if record[entity_val['createdAt']]:
-            response_dict[record[entity_val['id']]]['createdAt'] = record[entity_val['createdAt']].replace(' ','')
-          if record[entity_val['modifiedAt']]:
-            response_dict[record[entity_val['id']]]['modifiedAt'] = record[entity_val['modifiedAt']].replace(' ','')
-          if record[entity_val['observedAt']]:
-            response_dict[record[entity_val['id']]]['observedAt'] = record[entity_val['observedAt']].replace(' ','')
-        else:
-          if record[entity_val['observedAt']]:
-            response_dict[record[entity_val['id']]]['observedAt'] = record[entity_val['observedAt']].replace(' ','')
+        if record[entity_val['createdAt']]:
+          response_dict[record[entity_val['id']]]['createdAt'] = record[entity_val['createdAt']].replace(' ','')
+        if record[entity_val['modifiedAt']]:
+          response_dict[record[entity_val['id']]]['modifiedAt'] = record[entity_val['modifiedAt']].replace(' ','')
         if record[entity_val['location']]:
           response_dict[record[entity_val['id']]]['location'] = {"type": "GeoProperty", 'value': json.loads(record[entity_val['location']])}
         if context:
@@ -573,7 +561,7 @@ def build_sql_query_for_q(statement, params, q_params, data, attributes, app):
           else:
             statement += ' ' + q_params[count][index] + ' '
         statement += ' )'
-    if data['geoproperty'] != 'geo_property':
+    if data['coordinates']:
       statement, params, attributes, status, error = build_sql_query_for_geoproperty_for_attributes(statement, params, data, attributes, app)
     statement += ' )'
     status = 1
@@ -601,24 +589,6 @@ def build_sql_query_for_geoproperty_for_attributes(statement, params, data, attr
     app.logger.error(traceback.format_exc())
     error = 'Error in building sql query for geoproperty.'
   return statement, params, attributes, status, error
-
-def build_sql_query_for_geoproperty_for_entity(statement, params, data, app):
-  """Build sql query for geoproperty"""
-  status = 0
-  error = ''
-  geo_property_dict = {'near_maxDistance': entity_geo_dwithin, 'near_minDistance': entity_geo_not_dwithin, 'within': entity_geo_within, 'contains': entity_geo_contains, 'intersects': entity_geo_intersects, 'equals': entity_geo_equals, 'disjoint': entity_geo_disjoint, 'overlaps': entity_geo_overlaps}
-  try:
-    statement += ' AND ' + geo_property_dict[data['georel']]
-    if data['georel'] in ['near_maxDistance', 'near_minDistance']:
-      params["geo_distance"] = data['near_distance']
-    params['geo_property'] = str({"type": data['geometry'], "coordinates": data['coordinates']})
-    status = 1
-  except Exception as e:
-    app.logger.error("Error: build_sql_query_for_geoproperty_for_entity")
-    app.logger.error(traceback.format_exc())
-    error = 'Error in building sql query for geoproperty.'
-  return statement, params, status, error
-
 
 def get_entities_ids_from_records(data, records, attributes):
   """Get entities ids from records"""
@@ -734,7 +704,7 @@ def build_sql_query_for_entities_with_attributes(data, cursor, run_sql, app):
       if not status:
         return statement, params, records, run_sql, status, error
     else:
-      if data['geoproperty'] != 'geo_property':
+      if data['coordinates']:
         statement, params, attributes, status, error = build_sql_query_for_geoproperty_for_attributes(statement, params, data, [], app, 'AND')
         if not status:
           return statement, params, records, run_sql, status, error
@@ -763,22 +733,18 @@ def sql_query_for_entities(data, app):
   error = ''
   try:
     if data['timerel'] == 'after':
-      statement += " WHERE entity_table."+ data['timeproperty']+">%(time)s"
+      statement += " WHERE attributes_table."+ data['timeproperty']+">%(time)s"
       params["time"] = data['time']
     elif data['timerel'] == 'before':
-      statement += " WHERE entity_table."+ data['timeproperty']+"<%(time)s"
+      statement += " WHERE attributes_table."+ data['timeproperty']+"<%(time)s"
       params["time"] = data['time']
     else:
-      statement += " WHERE entity_table."+ data['timeproperty']+">=%(time)s AND entity_table."+ data['timeproperty']+"<%(endtime)s"
+      statement += " WHERE attributes_table."+ data['timeproperty']+">=%(time)s AND attributes_table."+ data['timeproperty']+"<%(endtime)s"
       params["time"] = data['time']
       params["endtime"] = data['endtime']
-    if data['coordinates'] and data['geoproperty'] == 'geo_property':
-      statement, params,status, error = build_sql_query_for_geoproperty_for_entity(statement, params, data, app)
-      if not status:
-        return statement, params,status, error
     status = 1
   except Exception as e:
-    app.logger.error("Error: build_sql_query_for_entities_without_attributes")
+    app.logger.error("Error: sql_query_for_entities")
     app.logger.error(traceback.format_exc())
     error = 'Error in building sql query for entities without attributes.'
   return statement, params, status, error
@@ -837,7 +803,7 @@ def build_sql_query_for_entities(data, cursor, app):
   run_sql = 1
   records = []
   try:
-    if (data['q']) or (data['coordinates'] and  data['geoproperty'] != 'geo_property'):
+    if (data['q']) or (data['coordinates'] or  data['coordinates']):
       statement, params, records, run_sql, status, error = build_sql_query_for_entities_with_attributes(data, cursor, run_sql, app)
     else:
       statement, params, status, error = build_sql_query_for_entities_without_attributes(data, cursor, app)
@@ -876,10 +842,8 @@ def parse_geo_properties(data, args, app):
     else:
       if 'geoproperty' in args and args.get('geoproperty'):
         data['geoproperty'] = args.get('geoproperty')
-        if data['geoproperty'] == 'location':
-          data['geoproperty'] = 'geo_property'
       else:
-        data['geoproperty'] = 'geo_property'
+        data['geoproperty'] = 'location'
     status = 1
   except Exception as e:
     app.logger.error("Error: parse_geo_properties")
@@ -889,7 +853,7 @@ def parse_geo_properties(data, args, app):
 
 def get_temporal_entities_parameters(args, context, app):
   """Parse params"""
-  data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None, 'id_data': '', 'type_data': '','idPattern': None, 'q':None, 'csf':None, 'georel': None, 'geometry': None, 'coordinates': None, 'geoproperty': None}
+  data = {'timerel': None, 'time': None, 'endtime': None, 'timeproperty': 'observedAt', 'attrs': None, 'lastN': None, 'id_data': '', 'type_data': '','idPattern': None, 'q':None, 'csf':None, 'georel': None, 'geometry': None, 'coordinates': None, 'geoproperty': None, 'location': 'location'}
   timepropertyDict = {'modifiedAt':'modified_at', 'observedAt' :'observed_at', 'createdAt':'created_at'}
   status = 0
   error = ''
@@ -934,6 +898,8 @@ def get_temporal_entities_parameters(args, context, app):
         data['type_data'] = types.split(',')
     if 'options' in args and args.get('options'):
       data['options'] = args.get('options')
+    if data['geoproperty']:
+      data['location'] = data['geoproperty']
     data, status, error = expand_entities_params(data, context, app)
   except Exception as e:
     app.logger.error("Error: get_temporal_entities_parameters")

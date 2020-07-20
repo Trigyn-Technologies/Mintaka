@@ -17,16 +17,10 @@ def build_response_data_for_entity(record, context, data, app):
     first = record[0]
     response_data['id'] = first[entity_val['id']]
     response_data['type'] = compact_entity_params(first[entity_val['type']], context, {} ,app)
-    if 'options' in data and data['options'] == 'sysAttrs':
-      if first[entity_val['createdAt']]:
-        response_data['createdAt'] = first[entity_val['createdAt']].replace(' ','')
-      if first[entity_val['modifiedAt']]:
-        response_data['modifiedAt'] = first[entity_val['modifiedAt']].replace(' ','')
-      if first[entity_val['observedAt']]:
-        response_data['observedAt'] = first[entity_val['observedAt']].replace(' ','')
-    else:
-      if first[entity_val['observedAt']]:
-        response_data['observedAt'] = first[entity_val['observedAt']].replace(' ','')
+    if first[entity_val['createdAt']]:
+      response_data['createdAt'] = first[entity_val['createdAt']].replace(' ','')
+    if first[entity_val['modifiedAt']]:
+      response_data['modifiedAt'] = first[entity_val['modifiedAt']].replace(' ','')
     if first[entity_val['location']]:
       response_data['location'] = {"type": "GeoProperty", 'value': json.loads(first[entity_val['location']])}
     if 'options' in data and data['options'] == 'temporalValues':
