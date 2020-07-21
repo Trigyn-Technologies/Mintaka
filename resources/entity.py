@@ -21,8 +21,6 @@ def build_response_data_for_entity(record, context, data, app):
       response_data['createdAt'] = first[entity_val['createdAt']].replace(' ','')
     if first[entity_val['modifiedAt']]:
       response_data['modifiedAt'] = first[entity_val['modifiedAt']].replace(' ','')
-    if first[entity_val['location']]:
-      response_data['location'] = {"type": "GeoProperty", 'value': json.loads(first[entity_val['location']])}
     if 'options' in data and data['options'] == 'temporalValues':
       response_data, status, error = build_temporal_response_data_for_entity(record, response_data, context, data, app)
     else:
@@ -39,7 +37,7 @@ def build_response_data_for_entity(record, context, data, app):
 
 def build_normal_response_data_for_entity(record_list, response_data, context, data, app):
   """Build response if options = None"""
-  get_attr_val_dict = {'value_string': get_normal_value_string,  'value_boolean': get_normal_value_boolean, 'value_number':get_normal_value_number, 'value_relation': get_normal_value_relation, 'value_object':get_normal_value_object,'value_datetime':get_normal_value_datetime}
+  get_attr_val_dict = {'value_string': get_normal_value_string,  'value_boolean': get_normal_value_boolean, 'value_number':get_normal_value_number, 'value_relation': get_normal_value_relation, 'value_object':get_normal_value_object,'value_datetime':get_normal_value_datetime, 'value_geo':get_normal_value_geo}
   compacted_dict = {}
   status = 0
   error = ''
@@ -57,10 +55,13 @@ def build_normal_response_data_for_entity(record_list, response_data, context, d
       attr_dict = {}
       if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
         attr_dict = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_dict)
-      if record[attr_val['unit_code']]:
-        attr_dict['unitCode'] = record[attr_val['unit_code']]
-      if record[attr_val['location']]:
-        attr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[attr_val['location']])}
+      if 'value_geo' == record[attr_val['value_type']]:
+        attr_dict = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_dict)
+      else:
+        if record[attr_val['location']]:
+          attr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[attr_val['location']])}
+        if record[attr_val['unit_code']]:
+          attr_dict['unitCode'] = record[attr_val['unit_code']]
       if 'options' in data and data['options'] == 'sysAttrs':
         if record[attr_val['createdAt']]:
           attr_dict['createdAt'] = record[attr_val['createdAt']].replace(' ', '')
@@ -92,7 +93,7 @@ def build_normal_response_data_for_entity(record_list, response_data, context, d
 
 def build_temporal_response_data_for_entity(record_list, response_data, context, data, app):
   """Building response if options = Temporalvalues"""
-  get_attr_val_dict = {'value_string': get_temporal_value_string,  'value_boolean': get_temporal_value_boolean, 'value_number':get_temporal_value_number, 'value_relation': get_temporal_value_relation, 'value_object':get_temporal_value_object,'value_datetime':get_temporal_value_datetime}
+  get_attr_val_dict = {'value_string': get_temporal_value_string,  'value_boolean': get_temporal_value_boolean, 'value_number':get_temporal_value_number, 'value_relation': get_temporal_value_relation, 'value_object':get_temporal_value_object,'value_datetime':get_temporal_value_datetime, 'value_geo':get_temporal_value_geo}
   compacted_dict = {}
   status = 0
   error = ''
@@ -106,7 +107,7 @@ def build_temporal_response_data_for_entity(record_list, response_data, context,
       elif 'lastN' in data and data['lastN'] and len(response_data[attr]['values']) >= data['lastN']:
         continue
       attr_list = []
-      if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+      if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime', 'value_geo']:
         attr_list = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_list, response_data, attr) 
       if data['timeproperty'] == 'created_at':
         if record[attr_val['createdAt']]:
