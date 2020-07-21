@@ -29,7 +29,7 @@ def build_response_data_for_entities(record, context, data, app):
 
 def build_normal_response_data_for_entities(record_list, response_dict, context, data, app):
   """Build response if options = None"""
-  get_attr_val_dict = {'value_string': get_normal_value_string,  'value_boolean': get_normal_value_boolean, 'value_number':get_normal_value_number, 'value_relation': get_normal_value_relation, 'value_object':get_normal_value_object,'value_datetime':get_normal_value_datetime}
+  get_attr_val_dict = {'value_string': get_normal_value_string,  'value_boolean': get_normal_value_boolean, 'value_number':get_normal_value_number, 'value_relation': get_normal_value_relation, 'value_object':get_normal_value_object,'value_datetime':get_normal_value_datetime, 'value_geo':get_normal_value_geo}
   compacted_dict = {}
   response_data = []
   status = 0
@@ -53,8 +53,6 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
           response_dict[record[entity_val['id']]]['createdAt'] = record[entity_val['createdAt']].replace(' ','')
         if record[entity_val['modifiedAt']]:
           response_dict[record[entity_val['id']]]['modifiedAt'] = record[entity_val['modifiedAt']].replace(' ','')
-        if record[entity_val['location']]:
-          response_dict[record[entity_val['id']]]['location'] = {"type": "GeoProperty", 'value': json.loads(record[entity_val['location']])}
         if context:
           response_dict[record[entity_val['id']]]['@context'] = [context, default_context]
         else:
@@ -70,10 +68,13 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
         attr_dict = {}
         if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
           attr_dict = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_dict)
-        if record[attr_val['unit_code']]:
-          attr_dict['unitCode'] = record[attr_val['unit_code']]
-        if record[attr_val['location']]:
-          attr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[attr_val['location']])}
+        if 'value_geo' == record[attr_val['value_type']]:
+          attr_dict = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_dict)
+        else:
+          if record[attr_val['unit_code']]:
+            attr_dict['unitCode'] = record[attr_val['unit_code']]
+          if record[attr_val['location']]:
+            attr_dict['location'] = {"type": "GeoProperty", 'value': json.loads(record[attr_val['location']])}
         if 'options' in data and data['options'] == 'sysAttrs':
           if record[attr_val['createdAt']]:
             attr_dict['createdAt'] = record[attr_val['createdAt']].replace(' ', '')
@@ -106,7 +107,7 @@ def build_normal_response_data_for_entities(record_list, response_dict, context,
 
 def build_temporal_response_data_for_entities(record_list, response_dict, context, data, app):
   """Building response if options = Temporalvalues"""
-  get_attr_val_dict = {'value_string': get_temporal_value_string,  'value_boolean': get_temporal_value_boolean, 'value_number':get_temporal_value_number, 'value_relation': get_temporal_value_relation, 'value_object':get_temporal_value_object,'value_datetime':get_temporal_value_datetime}
+  get_attr_val_dict = {'value_string': get_temporal_value_string,  'value_boolean': get_temporal_value_boolean, 'value_number':get_temporal_value_number, 'value_relation': get_temporal_value_relation, 'value_object':get_temporal_value_object,'value_datetime':get_temporal_value_datetime, 'value_geo':get_temporal_value_geo}
   compacted_dict = {}
   response_data = []
   status = 0
@@ -128,8 +129,6 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
           response_dict[record[entity_val['id']]]['createdAt'] = record[entity_val['createdAt']].replace(' ','')
         if record[entity_val['modifiedAt']]:
           response_dict[record[entity_val['id']]]['modifiedAt'] = record[entity_val['modifiedAt']].replace(' ','')
-        if record[entity_val['location']]:
-          response_dict[record[entity_val['id']]]['location'] = {"type": "GeoProperty", 'value': json.loads(record[entity_val['location']])}
         if context:
           response_dict[record[entity_val['id']]]['@context'] = [context, default_context]
         else:
@@ -143,7 +142,7 @@ def build_temporal_response_data_for_entities(record_list, response_dict, contex
         elif 'lastN' in data and data['lastN'] and len(response_dict[record[entity_val['id']]][attr]['values']) >= data['lastN']:
           continue
         attr_list = []
-        if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime']:
+        if record[attr_val['value_type']] in ['value_string', 'value_boolean', 'value_number', 'value_relation', 'value_object','value_datetime', 'value_geo']:
           attr_list = get_attr_val_dict[record[attr_val['value_type']]](record, attr_val, attr_list, response_dict[record[entity_val['id']]], attr) 
         if data['timeproperty'] == 'created_at':
           if record[attr_val['createdAt']]:
@@ -626,12 +625,11 @@ def get_entities_ids_from_records(data, records, attributes):
   return records_data, attributes, entity_ids
 
 
-def build_sql_query_for_entities_after_attributes(data, records, attributes, app):
+def build_sql_query_for_entities_after_attributes(data, records, attributes, records_data, entity_ids, app):
   """Build sql query"""
   status = 0
   error = ''
   try:
-    records_data, attributes, entity_ids = get_entities_ids_from_records(data, records, attributes)
     statement, params, status, error = sql_query_for_entities(data, app)
     if not status:
       return statement, params, records_data, status, error
@@ -716,8 +714,13 @@ def build_sql_query_for_entities_with_attributes(data, cursor, run_sql, app):
       status = 1
       return statement, params, records_data, run_sql, status, error
     else:
+      
+      records_data, attributes, entity_ids = get_entities_ids_from_records(data, records, attributes)
+      if len(entity_ids) == 0:
+        status = 1
+        return statement, params, records_data, run_sql, status, error
       run_sql = 1
-      statement, params, records_data, status, error = build_sql_query_for_entities_after_attributes(data, records, attributes, app)
+      statement, params, records_data, status, error = build_sql_query_for_entities_after_attributes(data, records, attributes, records_data, entity_ids, app)
     status = 1
   except Exception as e:
     app.logger.error("Error: build_sql_query_for_entities_with_attributes")
@@ -803,7 +806,7 @@ def build_sql_query_for_entities(data, cursor, app):
   run_sql = 1
   records = []
   try:
-    if (data['q']) or (data['coordinates'] or  data['coordinates']):
+    if (data['q']) or (data['coordinates']):
       statement, params, records, run_sql, status, error = build_sql_query_for_entities_with_attributes(data, cursor, run_sql, app)
     else:
       statement, params, status, error = build_sql_query_for_entities_without_attributes(data, cursor, app)
@@ -1114,7 +1117,7 @@ def expand_entities_params(data, context, app):
           com = {"@context": context_list, data['attrs'][count]: data['attrs'][count]}
           expanded = jsonld.expand(com)
           data['attrs'][count] = list(expanded[0].keys())[0]
-    if data['geoproperty'] and data['geoproperty'] !='geo_property':
+    if data['geoproperty']:
       com = {"@context": context_list, data['geoproperty']: data['geoproperty']}
       expanded = jsonld.expand(com)
       data['geoproperty'] = list(expanded[0].keys())[0]
