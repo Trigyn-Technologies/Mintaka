@@ -869,9 +869,15 @@ def get_temporal_entities_parameters(args, context, app):
         data['timeproperty'] = timepropertyDict[args['timeproperty']]
       else:
         data['timeproperty'] = 'observed_at'
-      data['time'] = datetime.datetime.strptime(data['time'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
+      try:
+        data['time'] = datetime.datetime.strptime(data['time'], '%Y-%m-%dT%H:%M:%S.%fZ').strftime("%Y-%m-%d %H:%M:%S.%f")
+      except:
+        data['time'] = datetime.datetime.strptime(data['time'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
       if data['endtime']:
-        data['endtime'] = datetime.datetime.strptime(data['endtime'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
+        try:
+          data['endtime'] = datetime.datetime.strptime(data['endtime'], '%Y-%m-%dT%H:%M:%S.%fZ').strftime("%Y-%m-%d %H:%M:%S.%f")
+        except:
+          data['endtime'] = datetime.datetime.strptime(data['endtime'], '%Y-%m-%dT%H:%M:%SZ').strftime("%Y-%m-%d %H:%M:%S")
     if 'attrs' in args and args.get('attrs'):
       data['attrs'] = args.get('attrs').split(',')
     if 'lastN' in args and args.get('lastN'):
