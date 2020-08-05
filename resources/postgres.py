@@ -1,4 +1,5 @@
 import os
+from config import *
 from psycopg2 import connect
 import traceback
 
@@ -11,10 +12,11 @@ def create_postgres_connection(request, app):
     if 'NGSILD-Tenant' in request.headers and request.headers['NGSILD-Tenant']:
       dbName = request.headers['NGSILD-Tenant']
     else:
-      dbName = os.getenv('POSTGRES_DB')
-    user = os.getenv('POSTGRES_USER')
-    host = os.getenv('POSTGRES_HOST')
-    password = os.getenv('POSTGRES_PASSWORD')
+      dbName = os.getenv('POSTGRES_DB', POSTGRES_DB)
+    user = os.getenv('POSTGRES_USER', POSTGRES_USER)
+    host = os.getenv('POSTGRES_HOST', POSTGRES_HOST)
+    password = os.getenv('POSTGRES_PASSWORD', POSTGRES_PASSWORD)
+
     conn = connect(dbname = dbName, user = user,host = host,password = password)
     status = 1
   except Exception as e:
