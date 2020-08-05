@@ -1,0 +1,4 @@
+POSTGRES_DB="orion_ld"
+POSTGRES_USER="postgres"
+POSTGRES_HOST="0.0.0.0"
+POSTGRES_PASSWORD="password"
