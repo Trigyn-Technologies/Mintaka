@@ -277,11 +277,25 @@ sudo systemctl restart nginx
 ```bash
 docker-compose -f docker-compose.yml up -d
 ```
-It will be running on your IP:8000
-
 ## Run on ubuntu 18.04
 ```bash
 sudo systemctl restart nginx
 sudo systemctl start mintaka
 ```
+
 It will be running on your IP:8000
+And you will see the output like
+```text
+Mintaka is running
+````
+
+## Below are the apis supported
+```text
+Resource URI: /temporal/entities/
+Example: /temporal/entities?timerel=between&time=2020-01-23T14:20:00Z&endtime==2020-01-23T14:40:00Z
+Method: GET
+
+Resource URI:/temporal/entities/{entityId}
+Example: /temporal/entities/{entityID}?timerel=between&time=2020-01-23T14:20:00Z&endtime==2020-01-23T14:40:00Z 
+```
+
