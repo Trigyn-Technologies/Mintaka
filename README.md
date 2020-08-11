@@ -272,3 +272,13 @@ Start nginix
 ```bash
 sudo systemctl restart nginx
 ```
+
+#Run using Docker-compose
+```bash
+docker-compose -f docker-compose.yml up -d
+```
+#Run on ubuntu 18.04
+```bash
+sudo systemctl restart nginx
+sudo systemctl start mintaka
+```
