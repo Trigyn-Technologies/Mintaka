@@ -1,4 +1,4 @@
-#Mintaka: NGSI-LD-Temporal-App
+##Mintaka: NGSI-LD-Temporal-App
 This app is for NGSI-LD temporal queries.
 It is developed using python-flask and postgres db.
 The server is running using nginx.
@@ -273,12 +273,15 @@ Start nginix
 sudo systemctl restart nginx
 ```
 
-#Run using Docker-compose
+##Run using Docker-compose
 ```bash
 docker-compose -f docker-compose.yml up -d
 ```
-#Run on ubuntu 18.04
+It will be running on your IP:8000
+
+##Run on ubuntu 18.04
 ```bash
 sudo systemctl restart nginx
 sudo systemctl start mintaka
 ```
+It will be running on your IP:8000
