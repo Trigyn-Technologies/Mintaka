@@ -115,6 +115,9 @@ def get_temporal_entity(entity_id):
 
 load_context(default_context, app)
 
+@app.route("/", methods=['GET'])
+def service_running():
+  return "<h1 style='color:blue'>Mintaka is running</h1>"
 
 if __name__ == '__main__':
   

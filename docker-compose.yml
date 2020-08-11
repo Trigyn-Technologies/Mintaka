@@ -43,6 +43,6 @@ services:
     networks:
         - my-network
     ports:
-        - 80:80
+        - 8000:80
 networks:
     my-network:
