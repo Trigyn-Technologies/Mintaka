@@ -1,4 +1,4 @@
-##Mintaka: NGSI-LD-Temporal-App
+## Mintaka: NGSI-LD-Temporal-App
 This app is for NGSI-LD temporal queries.
 It is developed using python-flask and postgres db.
 The server is running using nginx.
@@ -8,7 +8,7 @@ It can run directly on Ubuntu 18.04 or can be run using docker also
 First pull the repo in your local machine either using git or svn
 git clone https://github.com/Trigyn-Technologies/Mintaka.git
 
-###Docker Installation
+### Docker Installation
 In the directory open docker-compose.yml and edit as below
 See the sample docker-compose.yml
 ```
@@ -73,7 +73,7 @@ wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-
 echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" |sudo tee  /etc/apt/sources.list.d/pgdg.list
 ```
 
-####Install Postgres
+#### Install Postgres
 ```bash
 sudo apt update
 sudo apt -y install postgresql-12 postgresql-client-12
@@ -170,20 +170,20 @@ CREATE TABLE IF NOT EXISTS attribute_sub_properties_table (entity_id TEXT NOT NU
 ctrl + d
 ```
 
-####Install nginx
+#### Install nginx
 ```bash
 sudo apt-get update
 sudo apt-get install nginx
 ```
 
-####Install python packages
+#### Install python packages
 ```bash
 sudo apt install python3-pip python3-dev build-essential libssl-dev libffi-dev python3-setuptools
 sudo apt-get install libpq-dev python-dev
 pip3 install virtualenv
 ```
 
-####Here my ubuntu username is ubuntu. - So after this replace ubuntu with your username whereever you see ubuntu
+#### Here my ubuntu username is ubuntu. - So after this replace ubuntu with your username whereever you see ubuntu
 ```bash
 cd /home/ubuntu
 mkdir mintaka
@@ -273,13 +273,13 @@ Start nginix
 sudo systemctl restart nginx
 ```
 
-##Run using Docker-compose
+## Run using Docker-compose
 ```bash
 docker-compose -f docker-compose.yml up -d
 ```
 It will be running on your IP:8000
 
-##Run on ubuntu 18.04
+## Run on ubuntu 18.04
 ```bash
 sudo systemctl restart nginx
 sudo systemctl start mintaka
