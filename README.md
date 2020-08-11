@@ -300,4 +300,4 @@ Resource URI:/temporal/entities/{entityId}
 Example: /temporal/entities/{entityID}?timerel=between&time=2020-01-23T14:20:00Z&endtime==2020-01-23T14:40:00Z 
 Method: GET
 ```
-
+Logs can be checked in the same directory mintaka.log
