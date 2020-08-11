@@ -281,6 +281,7 @@ docker-compose -f docker-compose.yml up -d
 ```bash
 sudo systemctl restart nginx
 sudo systemctl start mintaka
+sudo /etc/init.d/postgresql restart
 ```
 
 It will be running on your IP:8000
