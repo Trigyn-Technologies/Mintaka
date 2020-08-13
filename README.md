@@ -78,6 +78,7 @@ echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" 
 sudo apt update
 sudo apt -y install postgresql-12 postgresql-client-12
 sudo apt install postgis postgresql-12-postgis-3
+sudo apt-get install postgresql-12-postgis-3-scripts
 ```
 
 Add timescale db and posgis
