@@ -198,6 +198,7 @@ pip3 install validators
 pip3 install -U flask-cors
 pip3 install requests
 pip3 install psycopg2
+deactivate
 ```
 
 Create mintaka.service file
