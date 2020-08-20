@@ -4,7 +4,7 @@
 #
 ######################################################################################## 
 
-FROM python:3-slim AS builder
+FROM python:3.7-slim AS builder
 
 # Create the directory and instruct Docker to operate
 # from there from now on
@@ -32,7 +32,7 @@ COPY . .
 # as defined below.
 #
 ########################################################################################
-FROM python:3-slim AS anon-user
+FROM python:3.7-slim AS anon-user
 RUN sed -i -r "/^(root|nobody)/!d" /etc/passwd /etc/shadow /etc/group \
     && sed -i -r 's#^(.*):[^:]*$#\1:/sbin/nologin#' /etc/passwd
 
@@ -44,7 +44,7 @@ RUN sed -i -r "/^(root|nobody)/!d" /etc/passwd /etc/shadow /etc/group \
 
 FROM gcr.io/distroless/python3
 COPY --from=builder /app /app
-COPY --from=builder /usr/local/lib/python3.8/site-packages /usr/local/lib/python3.8/site-packages
+COPY --from=builder /usr/local/lib/python3.7/site-packages /usr/local/lib/python3.7/site-packages
 COPY --from=anon-user /etc/passwd /etc/shadow /etc/group /etc/
 
 USER nobody
