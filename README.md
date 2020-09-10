@@ -81,6 +81,11 @@ sudo apt install postgis postgresql-12-postgis-3
 sudo apt-get install postgresql-12-postgis-3-scripts
 ```
 
+Add Postgres development libraries
+```bash
+apt-get install libpq-dev
+```
+
 Add timescale db and posgis
 ```bash
 sudo add-apt-repository ppa:timescale/timescaledb-ppa
