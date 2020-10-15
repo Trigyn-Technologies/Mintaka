@@ -119,6 +119,12 @@ load_context(default_context, app)
 def service_running():
   return "<h1 style='color:blue'>Mintaka is running</h1>"
 
+@app.route("/version/", methods=['GET'])
+def version():
+  response_data = {"mintaka" : {"version" : "0.0.1"}}
+  response = app.response_class(response=json.dumps(response_data, indent=2), status=200,mimetype='application/json')
+  return response
+
 if __name__ == '__main__':
   
-  app.run(debug=True, host='0.0.0.0')
+  app.run(debug=True, host='0.0.0.0', threaded=True)
