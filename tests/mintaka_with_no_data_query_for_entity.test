@@ -1,0 +1,51 @@
+# Copyright 2018 FIWARE Foundation e.V.
+#
+# This file is part of Orion-LD Context Broker.
+#
+# Orion-LD Context Broker is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Orion-LD Context Broker is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero
+# General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with Orion-LD Context Broker. If not, see http://www.gnu.org/licenses/.
+#
+# For those usages not covered by this license please contact with
+# orionld at fiware dot org
+
+# VALGRIND_READY - to mark the test ready for valgrindTestSuite.sh
+
+--NAME--
+Test of mintaka basic entities query
+
+--SHELL-INIT--
+startMintakaDB
+
+
+--SHELL--
+
+#
+# 01. GET /temporal/entities/urn:ngsi-ld:Vehicle:5/?timerel=between&time=2000-02-02T14:20:00.00Z&endtime=2022-04-12T14:40:00.00Z
+#
+
+
+echo "01. GET /temporal/entities/urn:ngsi-ld:Vehicle:5/?timerel=between&time=2000-02-02T14:20:00.00Z&endtime=2022-04-12T14:40:00.00Z"
+echo "=============================="
+mintakaUrl --url "/temporal/entities/urn:ngsi-ld:Vehicle:5/?timerel=between&time=2000-02-02T14:20:00.00Z&endtime=2022-04-12T14:40:00.00Z" --header "NGSILD-Tenant:test_db11" --header "Content-Type:application/ld+json" --header "Link:<https://json-ld.org/contexts/person.jsonld>" --header "rel=http://www.w3.org/ns/json-ld#context" --header "type=application/ld+json" --header "accept:application/ld+json"
+echo
+echo
+
+
+--REGEXPECT--
+01. GET /temporal/entities/urn:ngsi-ld:Vehicle:5/?timerel=between&time=2000-02-02T14:20:00.00Z&endtime=2022-04-12T14:40:00.00Z
+==============================
+{}
+
+
+--TEARDOWN--
+stopMintakaDB
