@@ -26,12 +26,12 @@ Test of mintaka basic entity query for before time period
 --SHELL-INIT--
 startMintakaDB
 sqlMintaka --sql "INSERT INTO entity_table (entity_id, entity_type, created_at, modified_at, observed_at, geo_property)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/Vehicle','2017-04-02 14:16:00','2017-04-11 23:22:00','2017-04-11 23:22:00','POLYGON((100 0, 101 0, 102 1, 102 2, 100 0))');"
-sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/brandName','https://uri.etsi.org/ngsi-ld/default-context/brandName','value_string', false, 'Brand', 'NULL', 'BMW', NULL, NULL, 'NULL', 'POINT(8.5 41.2)', '2017-02-14 18:31:00', '2017-03-12 08:35:00', '2017-02-13 07:08:00','NULL');"
-sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/brandName','https://uri.etsi.org/ngsi-ld/default-context/brandName','value_string', false, 'Brand', 'NULL', 'BMW', NULL, NULL, 'NULL', 'POINT(8.5 41.2)', '2017-03-14 18:31:00', '2017-04-12 08:35:00', '2017-03-13 07:08:00','NULL');"
-sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/providedBy','https://uri.etsi.org/ngsi-ld/default-context/providedBy','value_object', false, 'provider', 'NULL', 'NULL', NULL, NULL, 'NULL', 'POLYGON((100 0, 101 0, 102 1, 102 2, 100 0))', '2017-02-10 05:41:00', '2017-03-10 09:33:00', '2017-02-05 10:19:00','urn:ngsi-ld:Person:Bob');"
-sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/brandName','https://uri.etsi.org/ngsi-ld/default-context/brandName','value_string', false, 'Brand', 'NULL', 'Mercedes', NULL, NULL, 'NULL', 'LINESTRING(100 0, 101 0, 102 1, 102 2)', '2020-02-15 00:04:00', '2020-03-02 04:00:00', '2020-02-09 07:43:00','NULL');"
-sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/providedBy','https://uri.etsi.org/ngsi-ld/default-context/providedBy','value_object', false, 'provider', 'NULL', 'NULL', NULL, NULL, 'NULL', 'POLYGON((100 0, 101 0, 102 1, 102 2, 100 0))', '2020-02-05 04:17:00', '2020-03-08 12:21:00', '2020-02-13 18:05:00','urn:ngsi-ld:Person:Bob');"
-sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/isParked','https://uri.etsi.org/ngsi-ld/default-context/isParked','value_object', false, 'Location', 'NULL', 'NULL', NULL, NULL, 'NULL', 'LINESTRING(100 0, 101 0, 102 1, 102 2)', '2020-02-06 16:03:00', '2020-03-08 00:29:00', '2020-02-05 05:33:00','urn:ngsi-ld:OffStreetParking:Downtown1');"
+sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object, instance_id)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/brandName','https://uri.etsi.org/ngsi-ld/default-context/brandName','value_string', false, 'Brand', 'NULL', 'BMW', NULL, NULL, 'NULL', 'POINT(8.5 41.2)', '2017-02-14 18:31:00', '2017-03-12 08:35:00', '2017-02-13 07:08:00','NULL', '1');"
+sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object, instance_id, instance_id)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/brandName','https://uri.etsi.org/ngsi-ld/default-context/brandName','value_string', false, 'Brand', 'NULL', 'BMW', NULL, NULL, 'NULL', 'POINT(8.5 41.2)', '2017-03-14 18:31:00', '2017-04-12 08:35:00', '2017-03-13 07:08:00','NULL', '2');"
+sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object, instance_id)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/providedBy','https://uri.etsi.org/ngsi-ld/default-context/providedBy','value_object', false, 'provider', 'NULL', 'NULL', NULL, NULL, 'NULL', 'POLYGON((100 0, 101 0, 102 1, 102 2, 100 0))', '2017-02-10 05:41:00', '2017-03-10 09:33:00', '2017-02-05 10:19:00','urn:ngsi-ld:Person:Bob', '3');"
+sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object, instance_id)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/brandName','https://uri.etsi.org/ngsi-ld/default-context/brandName','value_string', false, 'Brand', 'NULL', 'Mercedes', NULL, NULL, 'NULL', 'LINESTRING(100 0, 101 0, 102 1, 102 2)', '2020-02-15 00:04:00', '2020-03-02 04:00:00', '2020-02-09 07:43:00','NULL', '4');"
+sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object, instance_id)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/providedBy','https://uri.etsi.org/ngsi-ld/default-context/providedBy','value_object', false, 'provider', 'NULL', 'NULL', NULL, NULL, 'NULL', 'POLYGON((100 0, 101 0, 102 1, 102 2, 100 0))', '2020-02-05 04:17:00', '2020-03-08 12:21:00', '2020-02-13 18:05:00','urn:ngsi-ld:Person:Bob', '5');"
+sqlMintaka --sql "INSERT INTO attributes_table (entity_id, id, name, value_type, sub_property, unit_code, data_set_id, value_string, value_boolean, value_number, value_relation, geo_property, created_at, modified_at, observed_at, value_object, instance_id)VALUES ('urn:ngsi-ld:Vehicle:A4567','https://uri.etsi.org/ngsi-ld/default-context/isParked','https://uri.etsi.org/ngsi-ld/default-context/isParked','value_object', false, 'Location', 'NULL', 'NULL', NULL, NULL, 'NULL', 'LINESTRING(100 0, 101 0, 102 1, 102 2)', '2020-02-06 16:03:00', '2020-03-08 00:29:00', '2020-02-05 05:33:00','urn:ngsi-ld:OffStreetParking:Downtown1', '6');"
 
 --SHELL--
 
@@ -56,22 +56,6 @@ echo
   "createdAt": "2017-04-02T14:16:00:000Z",
   "modifiedAt": "2017-04-11T23:22:00:000Z",
   "brandName": [
-    {
-      "type": "Property",
-      "value": "BMW",
-      "location": {
-        "type": "GeoProperty",
-        "value": {
-          "type": "Point",
-          "coordinates": [
-            8.5,
-            41.2
-          ]
-        }
-      },
-      "unitCode": "Brand",
-      "observedAt": "2017-03-13T07:08:00:000Z"
-    },
     {
       "type": "Property",
       "value": "BMW",
