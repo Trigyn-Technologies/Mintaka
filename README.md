@@ -173,6 +173,18 @@ CREATE TABLE IF NOT EXISTS attribute_sub_properties_table (entity_id TEXT NOT NU
 \q
 ctrl + d
 ```
+Edit pg_hba.conf
+```bash
+locate pg_hba.conf
+nano /etc/postgresql/12/main/pg_hba.conf
+```
+Change this line
+local   all             postgres                                peer
+from peer to this
+```
+local   all             postgres                                md5
+```
+And save it
 
 #### Install nginx
 ```bash
