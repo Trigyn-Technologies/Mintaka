@@ -179,12 +179,17 @@ locate pg_hba.conf
 nano /etc/postgresql/12/main/pg_hba.conf
 ```
 Change this line
+```bash
 local   all             postgres                                peer
-from peer to this
 ```
+from peer to this
+```bash
 local   all             postgres                                md5
 ```
-And save it
+Save it and restart the postgres
+```bash
+sudo /etc/init.d/postgresql restart
+```
 
 #### Install nginx
 ```bash
