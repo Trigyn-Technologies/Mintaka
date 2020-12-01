@@ -150,10 +150,10 @@ sudo /etc/init.d/postgresql restart
 sudo su - postgres
 psql
 ALTER USER postgres WITH PASSWORD 'password';
-CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS timescaledb;
 create database orion_ld;
 \c orion_ld;
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS timescaledb;
 drop table attribute_sub_properties_table; 
 drop table attributes_table;
 drop type attribute_value_type_enum;
