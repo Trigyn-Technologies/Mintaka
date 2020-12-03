@@ -9,11 +9,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: orion_ld
-  flask:
-    image: ngsild-flask
-    build:
-      context: .
-      dockerfile: Dockerfile
+  mintaka:
+    image: orionlddev/mintaka:latest
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     volumes:
       - "./:/app"
     command: flask run --host=0.0.0.0
@@ -28,7 +28,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=orion_ld
-      - POSTGRES_HOST=192.168.0.113
+      - POSTGRES_HOST=192.168.0.114
       - FLASK_APP=/app.py
 
     depends_on:
@@ -37,7 +37,7 @@ services:
     image: nginx:1.13.7
     container_name: nginx
     depends_on:
-        - flask
+        - mintaka
     volumes:
         - ./nginx.conf:/etc/nginx/conf.d/default.conf
     networks:
