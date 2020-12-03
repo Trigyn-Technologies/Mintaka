@@ -23,11 +23,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: orion_ld
-  flask:
-    image: ngsild-flask
-    build:
-      context: .
-      dockerfile: Dockerfile
+  mintaka:
+    image: orionlddev/mintaka:latest
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     volumes:
       - "./:/app"
     command: flask run --host=0.0.0.0
